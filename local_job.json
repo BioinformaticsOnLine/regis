@@ -1,0 +1,14 @@
+{
+    "email": "pranjal.p@example.com",
+    "data_type": "paired",
+    "method": "reference",
+    "reference": "/home/ajay/Desktop/Workspace_Pranjal/sample/in/GCA_907165135.1_OKI2018_I68_1.0_genomic.fna",
+    "gtf": "/home/ajay/Desktop/Workspace_Pranjal/sample/in/GCA_907165135.1_OKI2018_I68_1.0_genomic.gff",
+    "file1": "/home/ajay/Desktop/Workspace_Pranjal/sample/in/SRR10341223_forward.fastqsanger",
+    "file2": "/home/ajay/Desktop/Workspace_Pranjal/sample/in/SRR10341223_reverse.fastqsanger",
+    "enable_lnctar": true,
+    "lnctar_best_only": true,
+    "enable_intarna": true,
+    "intarna_best_only": true,
+    "execution_mode": "local"
+}

@@ -1,0 +1,129 @@
+{% set name = "regis" %}
+{% set version = "2.1.0" %}
+
+package:
+  name: {{ name|lower }}
+  version: {{ version }}
+
+source:
+  path: .
+  exclude:
+    - sample/
+    - logo/
+    - jobs/
+    - regis.db
+    - *.json
+    - .git/
+
+build:
+  number: 0
+  script: |
+    # Enable CGO for SQLite support
+    export CGO_ENABLED=1
+    
+    # Build the Go binary
+    go build -o regis .
+    
+    # Install to conda prefix
+    mkdir -p $PREFIX/bin
+    mkdir -p $PREFIX/share/regis/lnctar
+    
+    # Copy binary
+    cp regis $PREFIX/bin/regis
+    chmod +x $PREFIX/bin/regis
+    
+    # Bundle LncTar for target prediction
+    cp -r lnctar/* $PREFIX/share/regis/lnctar/
+    chmod +x $PREFIX/share/regis/lnctar/LncTar.pl
+
+requirements:
+  build:
+    - {{ compiler('c') }} # Required for go-sqlite3
+    - go >=1.21
+  
+  run:
+    - python >=3.10
+    - fastqc >=0.12.1
+    - trimmomatic >=0.39
+    - sortmerna >=4.3.4  # NEW: rRNA filtering
+    - trinity >=2.15.2
+    - hisat2 >=2.2.1
+    - samtools >=1.22.1
+    - stringtie >=1.3.0
+    - gffread >=0.12.7
+    - cpc2_standalone
+    - viennarna  # For RNAfold
+    - imagemagick  # For PS to PNG conversion
+    - gffcompare  # Compare transcripts with reference annotations
+    - seqkit  # Filter and manipulate FASTA sequences
+    - bedtools  # Genomic interval operations
+    - bedops  # BED file operations
+    - ucsc-gtftogenepred  # GTF to GenePred conversion
+    - ucsc-genepredtobed  # GenePred to BED conversion
+    - subread  # featureCounts for expression quantification
+    - cpat  # Coding Potential Assessment Tool (multi-species validation)
+    - intarna  # RNA-RNA interaction prediction
+    - rseqc  # RNA-seq quality control plots
+    - multiqc  # Aggregate QC reports into interactive HTML dashboard
+    - igv-reports  # Create self-contained HTML reports with embedded IGV browser
+
+channels:
+  - jitendralab
+  - bioconda
+  - conda-forge
+
+test:
+  commands:
+    - regis --help || true
+    - regis -h || true
+
+about:
+  home: https://github.com/BioinformaticsOnLine/regis
+  license: MIT
+  summary: "REGIS v2.0 - RNA-seq Guided Identification System for lncRNA Discovery (Go implementation)"
+  description: |
+    REGIS v2.0 is a comprehensive lncRNA identification pipeline implemented in Go
+    with a modern Terminal User Interface (TUI). It performs:
+    
+    - Quality control with FastQC
+    - Adapter trimming with Trimmomatic
+    - rRNA filtering with SortMeRNA (NEW in v2.0)
+    - De novo assembly with Trinity OR reference-based alignment with HISAT2
+    - Transcript assembly with StringTie
+    - Multi-tool coding potential assessment (CPC2 + CPAT for high-confidence predictions)
+    - Expression quantification with featureCounts
+    - Novel lncRNA classification with gffcompare
+    - Secondary structure prediction with RNAfold
+    - lncRNA-mRNA interaction prediction with LncTar
+    - RNA-RNA interaction cross-validation with IntaRNA
+    - Consensus target analysis
+    - Gene list building for enrichment analysis (getENRICH-ready)
+    - Comprehensive visualization (IGV reports, RSeQC, MultiQC)
+    
+    NEW in v2.0:
+    - Go implementation with TUI (Terminal User Interface)
+    - SortMeRNA integration for rRNA filtering
+    - Automatic SILVA database download
+    - Background gene list generation for enrichment
+    - Real-time progress tracking with animated TUI
+    - System resource monitoring (CPU/Memory)
+    - Interactive help and command display
+    
+    The pipeline supports both single-end and paired-end data,
+    and can work with or without a reference genome.
+    
+    REGIS Team:
+    Dr. Jitendra Narayan (Principal Investigator)
+    Dr. Stefano Tiozzo (CNRS-Sorbonne University)
+    Pranjal Pruthi (Researcher Programmer, CSIR IGIB)
+    
+    Funded by The Rockefeller Foundation and CSIR-IGIB.
+  doc_url: https://github.com/BioinformaticsOnLine/regis
+  dev_url: https://github.com/BioinformaticsOnLine/regis
+
+extra:
+  recipe-maintainers:
+    - jitendralab
+    - pranjal-pruthi
+  identifiers:
+    - biotools:regis
