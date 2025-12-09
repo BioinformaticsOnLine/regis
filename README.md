@@ -205,6 +205,18 @@ results_dir/
 If you use REGIS in your research, please cite:
 > *REGIS: A Comprehensive RNA-seq Guided Identification System for lncRNA Discovery. [Paper Link]*
 
+## 🗺️ Roadmap
+
+- [x] Core pipeline implementation
+- [x] TUI interface
+- [x] REST API
+- [x] SLURM support
+- [ ] Kubernetes support
+- [ ] Web UI dashboard
+- [ ] Nextflow DSL2 compatibility
+- [ ] Cloud execution (AWS Batch, GCP)
+
+
 ### Third-Party Citations
 REGIS wraps several academic tools. Please also cite:
 *   **LncTar**: *Li, J., et al. (2015). LncTar: a tool for predicting the RNA targets of long noncoding RNAs. Briefings in Bioinformatics.*
