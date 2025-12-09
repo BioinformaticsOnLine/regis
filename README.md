@@ -200,7 +200,7 @@ results_dir/
 
 ### Citing REGIS
 If you use REGIS in your research, please cite:
-> *Pruthi, P., Tiozzo, S., & Narayan, J. (202X). REGIS: A Comprehensive RNA-seq Guided Identification System for lncRNA Discovery. [Paper Link]*
+> *REGIS: A Comprehensive RNA-seq Guided Identification System for lncRNA Discovery. [Paper Link]*
 
 ### Third-Party Citations
 REGIS wraps several academic tools. Please also cite:
