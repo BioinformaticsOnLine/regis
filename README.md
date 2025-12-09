@@ -209,7 +209,25 @@ If you use REGIS in your research, please cite:
 REGIS wraps several academic tools. Please also cite:
 *   **LncTar**: *Li, J., et al. (2015). LncTar: a tool for predicting the RNA targets of long noncoding RNAs. Briefings in Bioinformatics.*
     *   *Note: LncTar is included/used under a license restricted to non-commercial genomic research.*
-*   **CPC2, CPAT, IntaRNA, FASTQC, HISAT2, StringTie, Trinity**: Please cite their respective original publications.
+
+
+### Quality Control & Preprocessing
+- **FastQC**: Andrews, S. (2010). FastQC: A Quality Control Tool for High Throughput Sequence Data. Available online at: http://www.bioinformatics.babraham.ac.uk/projects/fastqc
+
+### Alignment & Assembly
+- **HISAT2**: Kim, D., Paggi, J.M., Park, C., Bennett, C., & Salzberg, S.L. (2019). Graph-based genome alignment and genotyping with HISAT2 and HISAT-genotype. *Nature Biotechnology*, 37, 907-915. https://doi.org/10.1038/s41587-019-0201-4
+
+- **StringTie**: Pertea, M., Pertea, G.M., Antonescu, C.M., Chang, T.C., Mendell, J.T., & Salzberg, S.L. (2015). StringTie enables improved reconstruction of a transcriptome from RNA-seq reads. *Nature Biotechnology*, 33, 290-295. https://doi.org/10.1038/nbt.3122
+
+- **Trinity**: Grabherr, M.G., et al. (2011). Full-length transcriptome assembly from RNA-Seq data without a reference genome. *Nature Biotechnology*, 29, 644-652. https://doi.org/10.1038/nbt.1883
+
+### lncRNA Prediction
+- **CPC2**: Kang, Y.J., et al. (2017). CPC2: a fast and accurate coding potential assessment tool. *Nucleic Acids Research*, 45(W1), W12-W16. https://doi.org/10.1093/nar/gkx428
+
+- **CPAT**: Wang, L., et al. (2013). CPAT: Coding-Potential Assessment Tool using an alignment-free logistic regression model. *Nucleic Acids Research*, 41(6), e74. https://doi.org/10.1093/nar/gkt006
+
+### Target Prediction
+- **IntaRNA**: Mann, M., et al. (2017). IntaRNA 2.0: enhanced and customizable prediction of RNA-RNA interactions. *Nucleic Acids Research*, 45(W1), W435-W439. https://doi.org/10.1093/nar/gkx279
 
 ### License
 REGIS is licensed under the **MIT License**. See `LICENSE` for details.
