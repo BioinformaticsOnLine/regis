@@ -7,7 +7,10 @@
 
 **REGIS (RNA-seq Guided Identification System)** is a comprehensive, modular bioinformatics pipeline designed for the high-confidence identification and functional characterization of **Long Non-Coding RNAs (lncRNAs)**. 
 
-Re-engineered in **Go**, REGIS v2.0 brings a premium **Terminal User Interface (TUI)**, robust process management, and a seamless developer experience, while maintaining rigorous scientific accuracy.
+Re-engineered in **Go**, REGIS v1.0.1 brings a premium **Terminal User Interface (TUI)**, robust process management, and a seamless developer experience, while maintaining rigorous scientific accuracy.
+
+
+[![Typing SVG](https://readme-typing-svg.demolab.com?font=Fira+Code&size=30&duration=3000&pause=1000&color=00ADD8&center=true&vCenter=true&width=1000&lines=REGIS+%F0%9F%A7%AC+lncRNA+Identification+Pipeline;Built+with+Go+%7C+TUI+%7C+REST+API+%7C+SLURM+Support;NGS+Analysis+%E2%9A%A1+Fast+%E2%9A%A1+Scalable)](https://git.io/typing-svg)
 
 ---
 
