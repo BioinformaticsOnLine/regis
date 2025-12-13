@@ -2,7 +2,7 @@
 
 ![Go Version](https://img.shields.io/badge/Go-1.21%2B-00ADD8?style=for-the-badge&logo=go&logoColor=white)
 ![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20macOS-important?style=for-the-badge)
-![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
+![License](https://img.shields.io/badge/License-GPL_v3-blue?style=for-the-badge)
 ![Bioinformatics](https://img.shields.io/badge/Bioinformatics-LncRNA-blueviolet?style=for-the-badge)
 
 **REGIS (RNA-seq Guided Identification System)** is a comprehensive, modular bioinformatics pipeline designed for the high-confidence identification and functional characterization of **Long Non-Coding RNAs (lncRNAs)**. 
@@ -246,4 +246,4 @@ REGIS wraps several academic tools. Please also cite:
 - **IntaRNA**: Mann, M., et al. (2017). IntaRNA 2.0: enhanced and customizable prediction of RNA-RNA interactions. *Nucleic Acids Research*, 45(W1), W435-W439. https://doi.org/10.1093/nar/gkx279
 
 ### License
-REGIS is licensed under the **MIT License**. See `LICENSE` for details.
+REGIS is licensed under the **GNU General Public License v3.0**. See `LICENSE` for details.
