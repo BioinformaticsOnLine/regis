@@ -201,6 +201,31 @@ func Load(f *pflag.FlagSet, configFile string) (*Config, error) {
 		cfg.OutputDir = filepath.Join(".", fmt.Sprintf("regis_out_%s_%s", timestamp, shortID))
 	}
 
+	// FORCE ABSOLUTE PATHS to prevent bugs when modules change directory (e.g. os.Chdir)
+	if abs, err := filepath.Abs(cfg.OutputDir); err == nil {
+		cfg.OutputDir = abs
+	}
+	if cfg.Reference != "" {
+		if abs, err := filepath.Abs(cfg.Reference); err == nil {
+			cfg.Reference = abs
+		}
+	}
+	if cfg.GTF != "" {
+		if abs, err := filepath.Abs(cfg.GTF); err == nil {
+			cfg.GTF = abs
+		}
+	}
+	if cfg.File1 != "" {
+		if abs, err := filepath.Abs(cfg.File1); err == nil {
+			cfg.File1 = abs
+		}
+	}
+	if cfg.File2 != "" {
+		if abs, err := filepath.Abs(cfg.File2); err == nil {
+			cfg.File2 = abs
+		}
+	}
+
 	// Apply Server/Security Defaults
 	cfg.EnsureDefaults()
 
