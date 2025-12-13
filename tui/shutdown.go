@@ -34,11 +34,11 @@ func ShowGracefulShutdown() bool {
 			if i != 1 {
 				fmt.Print("s")
 			}
-			fmt.Print("...\033[0m\n")
+			fmt.Print("...\033[0m\r\n")
 			time.Sleep(1 * time.Second)
 		}
-		fmt.Println("\033[36m(｡･ω･)ﾉﾞ Goodbye! Pipeline terminated. See you next time!\033[0m")
-		fmt.Println()
+		fmt.Println("\033[36m(｡･ω･)ﾉﾞ Goodbye! Pipeline terminated. See you next time!\033[0m\r")
+		fmt.Println("\r")
 		return false
 	}
 	defer term.Restore(int(os.Stdin.Fd()), oldState)
@@ -61,14 +61,14 @@ func ShowGracefulShutdown() bool {
 		if i != 1 {
 			fmt.Print("s")
 		}
-		fmt.Print("...\033[0m\n")
+			fmt.Print("...\033[0m\r\n")
 
 		// Wait 1 second or until keypress
 		select {
 		case <-keyChan:
 			cancelled = true
-			fmt.Println("\033[32m(◕‿◕) Shutdown cancelled!\033[0m")
-			fmt.Println()
+			fmt.Println("\033[32m(◕‿◕) Shutdown cancelled!\033[0m\r")
+			fmt.Println("\r")
 			term.Restore(int(os.Stdin.Fd()), oldState)
 			time.Sleep(500 * time.Millisecond)
 			return true

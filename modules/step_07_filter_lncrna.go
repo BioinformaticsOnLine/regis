@@ -41,18 +41,14 @@ func Step07FilterLncRNA(ctx context.Context, cfg *config.Config) error {
 		return fmt.Errorf("failed to filter lncRNAs: %w", err)
 	}
 
-	// Step 2: Extract lncRNA sequences using seqkit
-	utils.ShowProgress("Extracting lncRNA sequences with seqkit")
+	// Step 2: Extract lncRNA sequences using native Go (replaces seqkit)
+	utils.ShowProgress("Extracting lncRNA sequences")
 	filteredIDsFile := filepath.Join(intermediateDir, "lncrna_filtered_ids.txt")
 	transcriptsFa := filepath.Join(cpc2Dir, "transcripts.fa")
 	lncRNAFa := filepath.Join(filteredDir, "lncrna_filtered.fa")
 
-	if err := utils.RunCommand(ctx, "seqkit", "grep",
-		"-f", filteredIDsFile,
-		transcriptsFa,
-		"-o", lncRNAFa,
-	); err != nil {
-		return fmt.Errorf("seqkit failed: %w", err)
+	if err := utils.ExtractSequences("Step07", filteredIDsFile, transcriptsFa, lncRNAFa); err != nil {
+		return fmt.Errorf("failed to extract lncRNA sequences: %w", err)
 	}
 
 	// Step 3: Extract lncRNA GTF (only for reference mode)
@@ -478,12 +474,8 @@ func parseAndFilterCounts(countsFile, expressionDir, novelDir, lncRNAFa string) 
 		highlyExpressedFa := filepath.Join(expressionDir, "highly_expressed.fa")
 		highlyExpressedIdsFile := filepath.Join(expressionDir, "highly_expressed_ids.txt")
 
-		// Use seqkit to extract sequences
-		if err := utils.RunCommand(context.Background(), "seqkit", "grep",
-			"-f", highlyExpressedIdsFile,
-			lncRNAFa,
-			"-o", highlyExpressedFa,
-		); err != nil {
+		// Use native utils to extract sequences
+		if err := utils.ExtractSequences("Step07-Expression", highlyExpressedIdsFile, lncRNAFa, highlyExpressedFa); err != nil {
 			utils.Warn("Failed to extract highly expressed sequences", zap.Error(err))
 		}
 	}

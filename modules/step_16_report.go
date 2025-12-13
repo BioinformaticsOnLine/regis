@@ -294,6 +294,8 @@ func collectLncRNAFilteringMetrics(cfg *config.Config) *LncRNAFilteringMetrics {
 		"s": "Intronic overlap on opposite strand",
 		"m": "Retained intron(s), all matched",
 		"n": "Retained intron(s), not all matched",
+		"k": "Contains reference (reverse-containment)",
+		"y": "Contains reference within intron",
 	}
 
 	// Parse class code counts
@@ -441,8 +443,8 @@ func collectStringTieMetrics(cfg *config.Config) *StringTieMetrics {
 
 // collectRNAfoldMetrics extracts RNAfold structure metrics
 func collectRNAfoldMetrics(cfg *config.Config) *RNAfoldMetrics {
-	pngDir := filepath.Join(cfg.OutputDir, "09_rnafold/png_files")
-	files, _ := filepath.Glob(filepath.Join(pngDir, "*.png"))
+	svgDir := filepath.Join(cfg.OutputDir, "09_rnafold/svg_files")
+	files, _ := filepath.Glob(filepath.Join(svgDir, "*.svg"))
 	return &RNAfoldMetrics{TotalStructures: int64(len(files))}
 }
 
@@ -654,16 +656,23 @@ func parseStepTimings(cfg *config.Config) []StepTiming {
 	}
 	defer file.Close()
 
-	var timings []StepTiming
-	stepNum := 0
+	// Map to store latest timing for each step (key is step ID)
+	latestTimings := make(map[int]StepTiming)
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := scanner.Text()
 
-		// Parse JSON log format: {"msg":"Step completed","step":"...","duration":76.414168369}
+		// Parse JSON log format: {"msg":"Step completed","step":"StepName","duration":76.4}
 		if strings.Contains(line, "Step completed") && strings.Contains(line, "duration") {
-			stepNum++
+			// Extract Step Name
+			nameRe := regexp.MustCompile(`"step":"([^"]+)"`)
+			nameMatches := nameRe.FindStringSubmatch(line)
+			if nameMatches == nil {
+				continue
+			}
+			stepName := nameMatches[1]
+			stepID := getStepID(stepName)
 
 			// Extract duration (in seconds as float)
 			durationRe := regexp.MustCompile(`"duration":([0-9.]+)`)
@@ -673,16 +682,73 @@ func parseStepTimings(cfg *config.Config) []StepTiming {
 				mins := totalSec / 60
 				secs := totalSec % 60
 
-				timings = append(timings, StepTiming{
-					StepNumber:  stepNum,
-					StepName:    getStepName(stepNum),
+				// Store/Overwrite in map to keep only the latest run info
+				latestTimings[stepID] = StepTiming{
+					StepNumber:  stepID,
+					StepName:    stepName,
 					Duration:    fmt.Sprintf("%dm %ds", mins, secs),
 					DurationSec: totalSec,
-				})
+				}
 			}
 		}
 	}
+
+	// Convert map to slice and sort by StepNumber
+	var timings []StepTiming
+	for _, t := range latestTimings {
+		timings = append(timings, t)
+	}
+
+	// Sort
+	// (Simple bubble sort or we can use sort package, but bubble is fine for 16 items)
+	for i := 0; i < len(timings)-1; i++ {
+		for j := 0; j < len(timings)-i-1; j++ {
+			if timings[j].StepNumber > timings[j+1].StepNumber {
+				timings[j], timings[j+1] = timings[j+1], timings[j]
+			}
+		}
+	}
+
 	return timings
+}
+
+// getStepID maps step names to their canonical ID
+func getStepID(name string) int {
+	name = strings.ToLower(name)
+	if strings.Contains(name, "fastqc") {
+		return 1
+	} else if strings.Contains(name, "trimmomatic") {
+		return 2
+	} else if strings.Contains(name, "sortmerna") {
+		return 3
+	} else if strings.Contains(name, "hisat2") || strings.Contains(name, "alignment") {
+		return 4
+	} else if strings.Contains(name, "cpc2") {
+		return 5
+	} else if strings.Contains(name, "cpat") {
+		return 6
+	} else if strings.Contains(name, "lncrna filtering") || strings.Contains(name, "filtering") {
+		return 7
+	} else if strings.Contains(name, "rnafold") || strings.Contains(name, "structure") {
+		return 8
+	} else if strings.Contains(name, "lnctar") {
+		return 9
+	} else if strings.Contains(name, "intarna") {
+		return 10
+	} else if strings.Contains(name, "consensus") {
+		return 11
+	} else if strings.Contains(name, "enrichment") {
+		return 12
+	} else if strings.Contains(name, "rseqc") {
+		return 13
+	} else if strings.Contains(name, "igv") {
+		return 14
+	} else if strings.Contains(name, "multiqc") {
+		return 15
+	} else if strings.Contains(name, "report") {
+		return 16
+	}
+	return 99 // Unknown
 }
 
 // getStepName returns the name for a given step number
@@ -691,7 +757,7 @@ func getStepName(num int) string {
 		1: "FastQC", 2: "Trimmomatic", 3: "SortMeRNA", 4: "HISAT2/StringTie",
 		5: "CPC2", 6: "CPAT", 7: "lncRNA Filtering", 8: "RNAfold",
 		9: "LncTar", 10: "IntaRNA", 11: "Consensus", 12: "Enrichment",
-		13: "RSeQC", 14: "IGV", 15: "MultiQC",
+		13: "RSeQC", 14: "IGV", 15: "MultiQC", 16: "Report",
 	}
 	if name, ok := names[num]; ok {
 		return name

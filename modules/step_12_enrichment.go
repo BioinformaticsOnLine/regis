@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -110,6 +112,8 @@ func Step12Enrichment(ctx context.Context, cfg *config.Config) error {
 		utils.Warn("No nearest gene assignments could be made")
 		return nil
 	}
+
+
 
 	// Step 4: Extract genes near lncRNAs
 	genesNearLncRNAsIntermediate := filepath.Join(enrichmentIntermediateDir, "genes_near_lncRNAs.txt")
@@ -225,36 +229,71 @@ func filterBestCandidates(filterFile, inputBed, outputBed string) error {
 	return utils.WriteLines(outputBed, outputLines)
 }
 
-// buildGeneBedFromGTF builds a BED file of genes from GTF
+// buildGeneBedFromGTF builds a BED file of genes from GTF using native Go parsing
 func buildGeneBedFromGTF(ctx context.Context, gtfFile, outputBed string) error {
-	// AWK script to extract gene features and convert to BED
-	awkScript := `BEGIN{OFS="\t"}
-	($3=="gene" || $3=="transcript" || $3=="mRNA") && !seen[$0]++ {
-		gene="";
-		if (match($0, /gene_id "([^"]+)"/, a)) {
-			gene=a[1];
-		}
-		else if (match($0, /transcript_id "([^"]+)"/, a)) {
-			gene=a[1];
-		}
-		else if (match($0, /locus_tag=([^;]+)/, a)) {
-			gene=a[1];
-		}
-		else if (match($0, /Name=([^;]+)/, a)) {
-			gene=a[1];
-		}
-		else if (match($0, /ID=([^;]+)/, a)) {
-			gene=a[1];
-		}
-		
-		if (gene!="" && !genes_seen[gene]++) {
-			print $1,$4-1,$5,gene,".",$7;
-		}
-	}`
+	file, err := os.Open(gtfFile)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
 
-	// Run AWK to create BED file using bash for proper redirection
-	cmd := fmt.Sprintf("awk '%s' \"%s\" > \"%s\"", awkScript, gtfFile, outputBed)
-	return utils.RunCommand(ctx, "bash", "-c", cmd)
+	out, err := os.Create(outputBed)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	writer := bufio.NewWriter(out)
+	defer writer.Flush()
+
+	scanner := bufio.NewScanner(file)
+	// Use a large buffer for long lines often found in GFF
+	buf := make([]byte, 0, 64*1024)
+	scanner.Buffer(buf, 10*1024*1024)
+
+	seen := make(map[string]bool)
+	seenGenes := make(map[string]bool)
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.HasPrefix(line, "#") || strings.TrimSpace(line) == "" {
+			continue
+		}
+
+		fields := strings.Split(line, "\t")
+		if len(fields) < 9 {
+			continue
+		}
+
+		// Filter for gene features
+		featureType := fields[2]
+		if featureType != "gene" && featureType != "transcript" && featureType != "mRNA" {
+			continue
+		}
+
+		// Avoid processing exact duplicate lines
+		if seen[line] {
+			continue
+		}
+		seen[line] = true
+
+		// Parse attributes to find ID/Name
+		attributes := fields[8]
+		geneID := parseGeneID(attributes)
+
+		if geneID != "" && !seenGenes[geneID] {
+			seenGenes[geneID] = true
+			// Write BED: chr, start-1, end, name, score, strand
+			// GFF is 1-based, BED is 0-based start
+			start, _ := strconv.Atoi(fields[3])
+			bedStart := start - 1
+			end := fields[4]
+			strand := fields[6]
+			fmt.Fprintf(writer, "%s\t%d\t%s\t%s\t.\t%s\n", fields[0], bedStart, end, geneID, strand)
+		}
+	}
+
+	return scanner.Err()
 }
 
 // extractNearestGenes extracts unique genes from bedtools closest output
@@ -587,37 +626,111 @@ func combineGeneLists(genesNear, genesLncTar, genesIntaRNA, genesConsensus, outp
 	return utils.WriteLines(outputFile, genes)
 }
 
-// extractAllGenesFromGTF extracts all unique gene IDs from GTF for background gene list
-// This is used for enrichment analysis tools like getENRICH
+// extractAllGenesFromGTF extracts all unique gene IDs from GTF for background gene list using native Go
 func extractAllGenesFromGTF(ctx context.Context, gtfFile, outputFile string) error {
-	// AWK script to extract all gene IDs from GTF
-	awkScript := `BEGIN{OFS="\t"}
-	($3=="gene" || $3=="mRNA" || $3=="transcript") {
-		gene="";
-		if (match($0, /locus_tag=([^;]+)/, a)) {
-			gene=a[1];
-		}
-		else if (match($0, /gene_id "([^"]+)"/, a)) {
-			gene=a[1];
-		}
-		else if (match($0, /gene_id=([^;]+)/, a)) {
-			gene=a[1];
-		}
-		else if (match($0, /ID=gene-([^;]+)/, a)) {
-			gene="gene-" a[1];
-		}
-		else if (match($0, /ID=([^;]+)/, a)) {
-			gene=a[1];
-		}
-		
-		if (gene!="" && !seen[gene]++) {
-			print gene;
-		}
-	}`
+	file, err := os.Open(gtfFile)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
 
-	// Run AWK to extract genes and sort uniquely
-	cmd := fmt.Sprintf("awk '%s' \"%s\" | sort -u > \"%s\"", awkScript, gtfFile, outputFile)
-	return utils.RunCommand(ctx, "bash", "-c", cmd)
+	out, err := os.Create(outputFile)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	writer := bufio.NewWriter(out)
+	defer writer.Flush()
+
+	scanner := bufio.NewScanner(file)
+	// Use a large buffer
+	buf := make([]byte, 0, 64*1024)
+	scanner.Buffer(buf, 10*1024*1024)
+
+	seenGenes := make(map[string]bool)
+	var genes []string
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.HasPrefix(line, "#") {
+			continue
+		}
+
+		fields := strings.Split(line, "\t")
+		if len(fields) < 9 {
+			continue
+		}
+
+		featureType := fields[2]
+		if featureType != "gene" && featureType != "transcript" && featureType != "mRNA" {
+			continue
+		}
+
+		geneID := parseGeneID(fields[8])
+		if geneID != "" && !seenGenes[geneID] {
+			seenGenes[geneID] = true
+			genes = append(genes, geneID)
+		}
+	}
+
+	// Sort genes for consistent output
+	// Using a simple sort is fast enough for gene lists
+	sort.Strings(genes)
+	for _, gene := range genes {
+		fmt.Fprintln(writer, gene)
+	}
+
+	return scanner.Err()
+}
+
+// parseGeneID tries to extract a meaningful ID from GFF/GTF attributes
+// It handles both GTF style (key "value") and GFF3 style (key=value)
+func parseGeneID(attributes string) string {
+	// Strategy: Split by semicolon, clean whitespace, check common keys
+	parts := strings.Split(attributes, ";")
+	
+	// Pre-allocate map for lookups if needed, but iterating is often faster for small sets
+	// Priority list of keys to look for
+	targetKeys := []string{"gene_id", "transcript_id", "locus_tag", "Name", "ID", "gene_name"}
+	
+	vals := make(map[string]string)
+
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+
+		// Check for GTF style: key "value"
+		if strings.Contains(part, "\"") {
+			firstSpace := strings.Index(part, " ")
+			if firstSpace > 0 {
+				key := part[:firstSpace]
+				val := strings.Trim(part[firstSpace+1:], "\" \t")
+				vals[key] = val
+			}
+		} else if strings.Contains(part, "=") {
+			// Check for GFF3 style: key=value
+			kv := strings.SplitN(part, "=", 2)
+			if len(kv) == 2 {
+				vals[kv[0]] = kv[1]
+			}
+		}
+	}
+
+	// Return first matching key from priority list
+	for _, key := range targetKeys {
+		if v, ok := vals[key]; ok {
+			// Special handling for "ID=gene-XYZ" which is common in GFF
+			if key == "ID" && strings.HasPrefix(v, "gene-") {
+				return strings.TrimPrefix(v, "gene-")
+			}
+			return v
+		}
+	}
+	
+	return ""
 }
 
 // countLines counts non-empty lines in a file

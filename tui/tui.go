@@ -67,8 +67,9 @@ type PipelineMetadataMsg struct {
 }
 
 type PipelineCompleteMsg struct {
-	Success  bool
-	Duration time.Duration
+	Success       bool
+	Duration      time.Duration
+	FailureReason string
 }
 
 type SystemMetricsMsg struct {
@@ -134,6 +135,7 @@ type Model struct {
 	// Pipeline state
 	PipelineRunning bool
 	PipelineSuccess bool
+	FailureReason   string
 
 	// Step completion tracking
 	completedSteps     map[int]time.Duration // Maps step number to duration
@@ -385,6 +387,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case PipelineCompleteMsg:
 		m.PipelineRunning = false
 		m.PipelineSuccess = msg.Success
+		m.FailureReason = msg.FailureReason
 		m.spinnerRunning = false
 
 		// Clear current command and step to remove "Running" display

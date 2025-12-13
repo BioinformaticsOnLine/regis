@@ -14,6 +14,14 @@ import (
 )
 
 // GetJobMetrics serves the pipeline_summary.json file
+// @Summary Get job metrics
+// @Description Get computational metrics (runtime, resources) for a completed job
+// @Tags jobs
+// @Produce json
+// @Param uuid path string true "Job UUID"
+// @Success 200 {object} map[string]interface{}
+// @Failure 404 {object} map[string]interface{}
+// @Router /jobs/{uuid}/results/metrics [get]
 func GetJobMetrics(c *fiber.Ctx) error {
 	jobID := c.Params("uuid")
 
@@ -51,6 +59,15 @@ func GetJobMetrics(c *fiber.Ctx) error {
 }
 
 // DownloadJobResults streams a ZIP archive of the results
+// @Summary Download job results
+// @Description Download the full output directory as a ZIP file
+// @Tags jobs
+// @Produce application/zip
+// @Param uuid path string true "Job UUID"
+// @Success 200 {file} file
+// @Failure 404 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /jobs/{uuid}/results/download [get]
 func DownloadJobResults(c *fiber.Ctx) error {
 	jobID := c.Params("uuid")
 

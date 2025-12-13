@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/BioinformaticsOnLine/regis/config"
@@ -85,6 +86,27 @@ func Step10IntaRNA(ctx context.Context, cfg *config.Config) error {
 	lncCount, _ := countFastaSequences(intarnaInput)
 	utils.Info(fmt.Sprintf("Analyzing %d lncRNAs with IntaRNA (using %d threads)", lncCount, cfg.Threads))
 
+	// Optimization: Filter targets to include ONLY coding transcripts (mRNAs)
+	// IntaRNA is slow ($O(N \cdot M)$), so searching against non-coding targets is wasteful.
+	utils.ShowProgress("Optimizing IntaRNA: Filtering targets to coding transcripts only")
+	cpc2Output := filepath.Join(cfg.OutputDir, "06_cpc2", "cpc2_output.txt")
+	codingIDsFile := filepath.Join(intarnaDir, "coding_ids.txt")
+	codingFa := filepath.Join(intarnaDir, "coding_transcripts.fa")
+
+	if err := extractCodingIDs(cpc2Output, codingIDsFile); err != nil {
+		utils.Warn("Failed to extracting coding IDs from CPC2 output - falling back to full transcriptome", zap.Error(err))
+	} else {
+		// Extract coding sequences
+		if err := utils.ExtractSequences("Step10-Coding", codingIDsFile, transcriptsFa, codingFa); err != nil {
+			utils.Warn("Failed to create coding transcripts subset - falling back to full transcriptome", zap.Error(err))
+		} else {
+			// Success: Switch target to coding transcripts
+			transcriptsFa = codingFa
+			targetCount, _ := countFastaSequences(codingFa)
+			utils.Info(fmt.Sprintf("Target search space reduced to %d coding transcripts (optimized)", targetCount))
+		}
+	}
+
 	// Copy input FASTA to IntaRNA directory for reference
 	var copyDest string
 	if cfg.IntaRNABestOnly {
@@ -99,7 +121,7 @@ func Step10IntaRNA(ctx context.Context, cfg *config.Config) error {
 	// Run IntaRNA with multi-threading, outputting in CSV format
 	if err := utils.RunCommand(ctx, "IntaRNA",
 		"-q", intarnaInput,
-		"-t", transcriptsFa,
+		"-t", transcriptsFa, // Now points to optimized coding_transcripts.fa if successful
 		"--threads", fmt.Sprintf("%d", cfg.Threads),
 		"--outMode", "C", // CSV output
 		"--out", intarnaOutput,
@@ -118,6 +140,39 @@ func Step10IntaRNA(ctx context.Context, cfg *config.Config) error {
 	utils.Info("IntaRNA complete", zap.String("output", intarnaDir))
 
 	return nil
+}
+
+// extractCodingIDs parses CPC2 output and extracts IDs of coding transcripts
+func extractCodingIDs(cpc2Output, outputIDsFile string) error {
+	lines, err := utils.ReadLines(cpc2Output)
+	if err != nil {
+		return err
+	}
+
+	var codingIDs []string
+	// CPC2 output format: ID Length Peptide Fickett pI Integrity Coding_Prob Label
+	// Label (last column) should be "coding"
+
+	for i, line := range lines {
+		// Skip header
+		if i == 0 {
+			continue
+		}
+
+		fields := strings.Fields(line)
+		if len(fields) >= 8 {
+			label := fields[7] // 8th column
+			if label == "coding" {
+				codingIDs = append(codingIDs, fields[0])
+			}
+		}
+	}
+
+	if len(codingIDs) == 0 {
+		return fmt.Errorf("no coding transcripts found in CPC2 output")
+	}
+
+	return utils.WriteLines(outputIDsFile, codingIDs)
 }
 
 // countIntaRNAInteractions counts interactions in IntaRNA CSV output (skip header)

@@ -1,0 +1,449 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "REST API for controlling the REGIS lncRNA identification pipeline.",
+        "title": "REGIS Pipeline API",
+        "termsOfService": "http://swagger.io/terms/",
+        "contact": {
+            "name": "API Support",
+            "email": "support@regis.bio"
+        },
+        "license": {
+            "name": "GPL-3.0",
+            "url": "https://github.com/BioinformaticsOnLine/regis/blob/main/LICENSE"
+        },
+        "version": "1.0.1"
+    },
+    "host": "localhost:3000",
+    "basePath": "/api/v1",
+    "paths": {
+        "/jobs/submit": {
+            "post": {
+                "description": "Submit a job with the provided configuration. Requires strictly validated JSON payload.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "jobs"
+                ],
+                "summary": "Submit a new job",
+                "parameters": [
+                    {
+                        "description": "Job Configuration",
+                        "name": "job",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/config.Config"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/jobs/{uuid}/results": {
+            "get": {
+                "description": "Get the result summary/paths for a completed job",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "jobs"
+                ],
+                "summary": "Get job results",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Job UUID",
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/jobs/{uuid}/results/download": {
+            "get": {
+                "description": "Download the full output directory as a ZIP file",
+                "produces": [
+                    "application/zip"
+                ],
+                "tags": [
+                    "jobs"
+                ],
+                "summary": "Download job results",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Job UUID",
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "file"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/jobs/{uuid}/results/metrics": {
+            "get": {
+                "description": "Get computational metrics (runtime, resources) for a completed job",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "jobs"
+                ],
+                "summary": "Get job metrics",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Job UUID",
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/jobs/{uuid}/status": {
+            "get": {
+                "description": "Get the current status of a job by UUID",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "jobs"
+                ],
+                "summary": "Get job status",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Job UUID",
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.Job"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "config.Config": {
+            "type": "object",
+            "required": [
+                "data_type",
+                "email",
+                "file1",
+                "method"
+            ],
+            "properties": {
+                "api_key": {
+                    "description": "Security",
+                    "type": "string"
+                },
+                "assets_dir": {
+                    "description": "Asset paths",
+                    "type": "string"
+                },
+                "cpat_hex": {
+                    "description": "Custom CPAT hexamer model",
+                    "type": "string"
+                },
+                "cpat_hexamer_file": {
+                    "type": "string"
+                },
+                "cpat_logit": {
+                    "description": "Custom CPAT logit model",
+                    "type": "string"
+                },
+                "cpat_logit_file": {
+                    "type": "string"
+                },
+                "cpat_models_dir": {
+                    "type": "string"
+                },
+                "cpat_species": {
+                    "description": "Runtime state (ignored by config loader)",
+                    "type": "string"
+                },
+                "data_type": {
+                    "description": "Required parameters",
+                    "type": "string",
+                    "enum": [
+                        "single",
+                        "paired"
+                    ]
+                },
+                "email": {
+                    "description": "User email",
+                    "type": "string"
+                },
+                "enable_intarna": {
+                    "description": "IntaRNA settings",
+                    "type": "boolean"
+                },
+                "enable_lnctar": {
+                    "description": "LncTar settings",
+                    "type": "boolean"
+                },
+                "enable_sortmerna": {
+                    "description": "rRNA Filtering",
+                    "type": "boolean"
+                },
+                "execution_mode": {
+                    "description": "Execution Configuration",
+                    "type": "string"
+                },
+                "file1": {
+                    "description": "First FASTQ file",
+                    "type": "string"
+                },
+                "file2": {
+                    "description": "Second FASTQ file",
+                    "type": "string"
+                },
+                "gtf": {
+                    "description": "Reference annotation GTF",
+                    "type": "string"
+                },
+                "intarna_best_only": {
+                    "type": "boolean"
+                },
+                "intarna_comprehensive": {
+                    "type": "boolean"
+                },
+                "intarna_highly": {
+                    "type": "boolean"
+                },
+                "lnctar_best_only": {
+                    "type": "boolean"
+                },
+                "lnctar_comprehensive": {
+                    "type": "boolean"
+                },
+                "lnctar_dir": {
+                    "type": "string"
+                },
+                "lnctar_highly": {
+                    "type": "boolean"
+                },
+                "lnctar_script": {
+                    "type": "string"
+                },
+                "log_file": {
+                    "type": "string"
+                },
+                "method": {
+                    "description": "\"denovo\" or \"reference\"",
+                    "type": "string",
+                    "enum": [
+                        "denovo",
+                        "reference"
+                    ]
+                },
+                "output_dir": {
+                    "description": "Output directory",
+                    "type": "string"
+                },
+                "reference": {
+                    "description": "Reference mode parameters",
+                    "type": "string"
+                },
+                "retention_days": {
+                    "description": "Days to keep job outputs (0 = forever)",
+                    "type": "integer"
+                },
+                "run_id": {
+                    "description": "Run identification",
+                    "type": "string"
+                },
+                "skip_cpat": {
+                    "description": "Validation options",
+                    "type": "boolean"
+                },
+                "slurm": {
+                    "$ref": "#/definitions/config.SlurmConfig"
+                },
+                "species": {
+                    "description": "Species name for CPAT",
+                    "type": "string"
+                },
+                "threads": {
+                    "description": "Optional parameters",
+                    "type": "integer"
+                },
+                "validation_mode": {
+                    "type": "string"
+                }
+            }
+        },
+        "config.SlurmConfig": {
+            "type": "object",
+            "properties": {
+                "cpus": {
+                    "type": "integer"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "extra_args": {
+                    "type": "string"
+                },
+                "extra_script": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "job_name": {
+                    "type": "string"
+                },
+                "memory": {
+                    "type": "string"
+                },
+                "nodes": {
+                    "type": "integer"
+                },
+                "partition": {
+                    "type": "string"
+                },
+                "time": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.Job": {
+            "type": "object",
+            "properties": {
+                "config": {
+                    "description": "Store as JSON in DB",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/config.Config"
+                        }
+                    ]
+                },
+                "end_time": {
+                    "type": "string"
+                },
+                "error": {
+                    "type": "string"
+                },
+                "external_id": {
+                    "description": "Slurm Job ID",
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "start_time": {
+                    "type": "string"
+                },
+                "status": {
+                    "description": "queued, running, completed, failed",
+                    "type": "string"
+                }
+            }
+        }
+    }
+}

@@ -3,6 +3,7 @@ package modules
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -62,19 +63,31 @@ func Step13RSeQC(ctx context.Context, cfg *config.Config) error {
 	}
 
 	// Read distribution
+	// Read distribution
 	utils.ShowProgress("Analyzing read distribution")
 	readDistFile := filepath.Join(rseqcDir, "read_distribution.txt")
-	readDistCmd := fmt.Sprintf("read_distribution.py -i \"%s\" -r \"%s\" > \"%s\"", bamFile, bed12File, readDistFile)
-	if err := utils.RunCommand(ctx, "bash", "-c", readDistCmd); err != nil {
+	// Run command directly and capture output
+	if output, err := utils.RunCommandWithOutput(ctx, "read_distribution.py", "-i", bamFile, "-r", bed12File); err != nil {
 		utils.Warn("read_distribution.py failed", zap.Error(err))
+	} else {
+		// Write output to file
+		if err := os.WriteFile(readDistFile, []byte(output), 0644); err != nil {
+			utils.Warn("Failed to write read distribution output", zap.Error(err))
+		}
 	}
 
 	// Infer experiment (strand specificity)
+	// Infer experiment (strand specificity)
 	utils.ShowProgress("Inferring experiment type")
 	inferExpFile := filepath.Join(rseqcDir, "infer_experiment.txt")
-	inferExpCmd := fmt.Sprintf("infer_experiment.py -i \"%s\" -r \"%s\" > \"%s\"", bamFile, bed12File, inferExpFile)
-	if err := utils.RunCommand(ctx, "bash", "-c", inferExpCmd); err != nil {
+	// Run command directly and capture output
+	if output, err := utils.RunCommandWithOutput(ctx, "infer_experiment.py", "-i", bamFile, "-r", bed12File); err != nil {
 		utils.Warn("infer_experiment.py failed", zap.Error(err))
+	} else {
+		// Write output to file
+		if err := os.WriteFile(inferExpFile, []byte(output), 0644); err != nil {
+			utils.Warn("Failed to write infer experiment output", zap.Error(err))
+		}
 	}
 
 	// Junction saturation
@@ -122,9 +135,10 @@ func convertGTFToBED12(ctx context.Context, gtfFile, workDir, outputBed string) 
 	}
 
 	// Clean up intermediate files
-	utils.RunCommand(ctx, "rm", "-f", genePredFile)
+	// Clean up intermediate files
+	os.Remove(genePredFile)
 	if gtfForConversion != gtfFile {
-		utils.RunCommand(ctx, "rm", "-f", gtfForConversion)
+		os.Remove(gtfForConversion)
 	}
 
 	return nil

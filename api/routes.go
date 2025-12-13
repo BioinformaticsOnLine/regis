@@ -19,8 +19,8 @@ func (s *Server) SetupRoutes() {
 		})
 	})
 
-	// Job Management Routes
-	jobs := v1.Group("/jobs")
+	// Job Management Routes (Protected)
+	jobs := v1.Group("/jobs", s.APIKeyMiddleware)
 	jobs.Post("/submit", handlers.SubmitJob)
 	jobs.Get("/:uuid/status", handlers.GetJobStatus)
 	jobs.Get("/:uuid/results", handlers.GetJobResults)

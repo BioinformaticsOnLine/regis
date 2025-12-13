@@ -37,10 +37,14 @@ func showLogo() {
 		Render("  RNA-seq Guided Identification System\n  lncRNA Discovery Pipeline v1.0")
 	contact := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#6272A4")).
-		Render("\n  Bugs: github.com/pranjalpruthi\n  Jitendralab CSIR IGIB | PI: Dr. Jitendra Narayan")
+		Render("\n  Bugs: github.com/pranjalpruthi")
 	separator := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#6272A4")).
 		Render(strings.Repeat("═", 80))
+
+	team := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#50FA7B")).
+		Render("\n  REGIS Team:\n  Dr. Jitendra Narayan (Principal Investigator)\n  Dr. Stefano Tiozzo (CNRS-Sorbonne University)\n  Pranjal Pruthi (Researcher Programmer, CSIR IGIB)")
 
 	banner := lipgloss.JoinVertical(lipgloss.Left,
 		"",
@@ -48,6 +52,7 @@ func showLogo() {
 		"", // Empty line after logo
 		subtitle,
 		contact,
+		team,
 		"", // Empty line before separator
 		separator,
 		"", // Empty line after separator

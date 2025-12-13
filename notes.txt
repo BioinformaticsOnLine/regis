@@ -1,0 +1,17 @@
+./regis -t paired -m reference \
+  -r /Users/pranjalpruthi/Documents/GitHub/regis-data/sample/in/GCA_907165135.1_OKI2018_I68_1.0_genomic.fna \
+  -g /Users/pranjalpruthi/Documents/GitHub/regis-data/sample/in/GCA_907165135.1_OKI2018_I68_1.0_genomic.gff \
+  -o /Users/pranjalpruthi/Documents/GitHub/regis/out_mac_test \
+  -f1 /Users/pranjalpruthi/Documents/GitHub/regis-data/sample/in/SRR10341223_forward.fastqsanger \
+  -f2 /Users/pranjalpruthi/Documents/GitHub/regis-data/sample/in/SRR10341223_reverse.fastqsanger \
+  --lnctar-best --intarna-best
+
+./regis -t paired -m reference \
+  -r /Users/pranjalpruthi/Documents/GitHub/regis-data/sample/in/GCA_907165135.1_OKI2018_I68_1.0_genomic.fna \
+  -g /Users/pranjalpruthi/Documents/GitHub/regis-data/sample/in/GCA_907165135.1_OKI2018_I68_1.0_genomic.gff \
+  -o /Users/pranjalpruthi/Documents/GitHub/regis/out_mac_test2 \
+  --f1 /Users/pranjalpruthi/Documents/GitHub/regis-data/sample/in/SRR10341223_forward.fastqsanger \
+  --f2 /Users/pranjalpruthi/Documents/GitHub/regis-data/sample/in/SRR10341223_reverse.fastqsanger \
+  --lnctar-best
+
+ CGO_ENABLED=1 CC=/Users/pranjalpruthi/mambaforge/envs/regis_dev/bin/x86_64-apple-darwin13.4.0-clang /Users/pranjalpruthi/mambaforge/envs/regis_dev/bin/go build -o regis;

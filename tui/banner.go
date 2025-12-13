@@ -3,9 +3,11 @@ package tui
 import (
 	"fmt"
 	"runtime"
+
+	"github.com/BioinformaticsOnLine/regis/version"
 )
 
-const version = "1.0.0"
+// const version = "1.0.0" // Removed
 
 func ShowBanner() {
 	// ASCII Logo
@@ -20,7 +22,7 @@ func ShowBanner() {
 
 	fmt.Println(logo)
 	fmt.Println("  RNA-seq Guided Identification System")
-	fmt.Println("  lncRNA Discovery Pipeline v" + version)
+	fmt.Println("  lncRNA Discovery Pipeline v" + version.Version)
 	fmt.Println()
 	fmt.Println("═══════════════════════════════════════════════════════════════════")
 	fmt.Println()
@@ -51,6 +53,7 @@ func ShowBanner() {
 	fmt.Println("  -p int        Number of threads (default: all available)")
 	fmt.Println("  -s string     Species for CPAT (Human, Mouse, Fly, Zebrafish)")
 	fmt.Println("  --skip-cpat   Force CPC2-only validation mode")
+	fmt.Println("  --sortmerna   Enable rRNA filtering using SortMeRNA")
 	fmt.Println()
 
 	// Target prediction

@@ -1,0 +1,311 @@
+basePath: /api/v1
+definitions:
+  config.Config:
+    properties:
+      api_key:
+        description: Security
+        type: string
+      assets_dir:
+        description: Asset paths
+        type: string
+      cpat_hex:
+        description: Custom CPAT hexamer model
+        type: string
+      cpat_hexamer_file:
+        type: string
+      cpat_logit:
+        description: Custom CPAT logit model
+        type: string
+      cpat_logit_file:
+        type: string
+      cpat_models_dir:
+        type: string
+      cpat_species:
+        description: Runtime state (ignored by config loader)
+        type: string
+      data_type:
+        description: Required parameters
+        enum:
+        - single
+        - paired
+        type: string
+      email:
+        description: User email
+        type: string
+      enable_intarna:
+        description: IntaRNA settings
+        type: boolean
+      enable_lnctar:
+        description: LncTar settings
+        type: boolean
+      enable_sortmerna:
+        description: rRNA Filtering
+        type: boolean
+      execution_mode:
+        description: Execution Configuration
+        type: string
+      file1:
+        description: First FASTQ file
+        type: string
+      file2:
+        description: Second FASTQ file
+        type: string
+      gtf:
+        description: Reference annotation GTF
+        type: string
+      intarna_best_only:
+        type: boolean
+      intarna_comprehensive:
+        type: boolean
+      intarna_highly:
+        type: boolean
+      lnctar_best_only:
+        type: boolean
+      lnctar_comprehensive:
+        type: boolean
+      lnctar_dir:
+        type: string
+      lnctar_highly:
+        type: boolean
+      lnctar_script:
+        type: string
+      log_file:
+        type: string
+      method:
+        description: '"denovo" or "reference"'
+        enum:
+        - denovo
+        - reference
+        type: string
+      output_dir:
+        description: Output directory
+        type: string
+      reference:
+        description: Reference mode parameters
+        type: string
+      retention_days:
+        description: Days to keep job outputs (0 = forever)
+        type: integer
+      run_id:
+        description: Run identification
+        type: string
+      skip_cpat:
+        description: Validation options
+        type: boolean
+      slurm:
+        $ref: '#/definitions/config.SlurmConfig'
+      species:
+        description: Species name for CPAT
+        type: string
+      threads:
+        description: Optional parameters
+        type: integer
+      validation_mode:
+        type: string
+    required:
+    - data_type
+    - email
+    - file1
+    - method
+    type: object
+  config.SlurmConfig:
+    properties:
+      cpus:
+        type: integer
+      email:
+        type: string
+      extra_args:
+        type: string
+      extra_script:
+        items:
+          type: string
+        type: array
+      job_name:
+        type: string
+      memory:
+        type: string
+      nodes:
+        type: integer
+      partition:
+        type: string
+      time:
+        type: string
+    type: object
+  handlers.Job:
+    properties:
+      config:
+        allOf:
+        - $ref: '#/definitions/config.Config'
+        description: Store as JSON in DB
+      end_time:
+        type: string
+      error:
+        type: string
+      external_id:
+        description: Slurm Job ID
+        type: string
+      id:
+        type: string
+      start_time:
+        type: string
+      status:
+        description: queued, running, completed, failed
+        type: string
+    type: object
+host: localhost:3000
+info:
+  contact:
+    email: support@regis.bio
+    name: API Support
+  description: REST API for controlling the REGIS lncRNA identification pipeline.
+  license:
+    name: GPL-3.0
+    url: https://github.com/BioinformaticsOnLine/regis/blob/main/LICENSE
+  termsOfService: http://swagger.io/terms/
+  title: REGIS Pipeline API
+  version: 1.0.1
+paths:
+  /jobs/{uuid}/results:
+    get:
+      description: Get the result summary/paths for a completed job
+      parameters:
+      - description: Job UUID
+        in: path
+        name: uuid
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get job results
+      tags:
+      - jobs
+  /jobs/{uuid}/results/download:
+    get:
+      description: Download the full output directory as a ZIP file
+      parameters:
+      - description: Job UUID
+        in: path
+        name: uuid
+        required: true
+        type: string
+      produces:
+      - application/zip
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: file
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Download job results
+      tags:
+      - jobs
+  /jobs/{uuid}/results/metrics:
+    get:
+      description: Get computational metrics (runtime, resources) for a completed
+        job
+      parameters:
+      - description: Job UUID
+        in: path
+        name: uuid
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get job metrics
+      tags:
+      - jobs
+  /jobs/{uuid}/status:
+    get:
+      description: Get the current status of a job by UUID
+      parameters:
+      - description: Job UUID
+        in: path
+        name: uuid
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.Job'
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get job status
+      tags:
+      - jobs
+  /jobs/submit:
+    post:
+      consumes:
+      - application/json
+      description: Submit a job with the provided configuration. Requires strictly
+        validated JSON payload.
+      parameters:
+      - description: Job Configuration
+        in: body
+        name: job
+        required: true
+        schema:
+          $ref: '#/definitions/config.Config'
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Submit a new job
+      tags:
+      - jobs
+swagger: "2.0"

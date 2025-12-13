@@ -54,9 +54,11 @@ func InitLogger(logFile string) error {
 	}
 
 	// Create multi-output core
+	// Create multi-output core
 	core := zapcore.NewTee(cores...)
 
-	Logger = zap.New(core, zap.AddCaller())
+	// Add CallerSkip(1) so logs show the actual caller (e.g., modules/step_01.go) instead of utils/logger.go
+	Logger = zap.New(core, zap.AddCaller(), zap.AddCallerSkip(1))
 	return nil
 }
 
@@ -64,19 +66,7 @@ func InitLogger(logFile string) error {
 func Info(msg string, fields ...zap.Field) {
 	if Logger != nil {
 		Logger.Info(msg, fields...)
-
-		// Send to TUI if available
-		if tuiMode && tuiProgram != nil {
-			// Type assert to get the Send method
-			if prog, ok := tuiProgram.(interface{ Send(tea.Msg) }); ok {
-				prog.Send(tui.LogEntryMsg{
-					Level:     "info",
-					Timestamp: time.Now(),
-					Message:   msg,
-					Caller:    "",
-				})
-			}
-		}
+		sendToTUI("info", msg)
 	}
 }
 
@@ -84,18 +74,7 @@ func Info(msg string, fields ...zap.Field) {
 func Error(msg string, fields ...zap.Field) {
 	if Logger != nil {
 		Logger.Error(msg, fields...)
-
-		// Send to TUI if available
-		if tuiMode && tuiProgram != nil {
-			if prog, ok := tuiProgram.(interface{ Send(tea.Msg) }); ok {
-				prog.Send(tui.LogEntryMsg{
-					Level:     "error",
-					Timestamp: time.Now(),
-					Message:   msg,
-					Caller:    "",
-				})
-			}
-		}
+		sendToTUI("error", msg)
 	}
 }
 
@@ -103,18 +82,7 @@ func Error(msg string, fields ...zap.Field) {
 func Warn(msg string, fields ...zap.Field) {
 	if Logger != nil {
 		Logger.Warn(msg, fields...)
-
-		// Send to TUI if available
-		if tuiMode && tuiProgram != nil {
-			if prog, ok := tuiProgram.(interface{ Send(tea.Msg) }); ok {
-				prog.Send(tui.LogEntryMsg{
-					Level:     "warn",
-					Timestamp: time.Now(),
-					Message:   msg,
-					Caller:    "",
-				})
-			}
-		}
+		sendToTUI("warn", msg)
 	}
 }
 
@@ -122,17 +90,20 @@ func Warn(msg string, fields ...zap.Field) {
 func Debug(msg string, fields ...zap.Field) {
 	if Logger != nil {
 		Logger.Debug(msg, fields...)
+		sendToTUI("debug", msg)
+	}
+}
 
-		// Send to TUI if available (only for important debug messages)
-		if tuiMode && tuiProgram != nil {
-			if prog, ok := tuiProgram.(interface{ Send(tea.Msg) }); ok {
-				prog.Send(tui.LogEntryMsg{
-					Level:     "debug",
-					Timestamp: time.Now(),
-					Message:   msg,
-					Caller:    "",
-				})
-			}
+// sendToTUI is a helper to clean up duplication
+func sendToTUI(level, msg string) {
+	if tuiMode && tuiProgram != nil {
+		if prog, ok := tuiProgram.(interface{ Send(tea.Msg) }); ok {
+			prog.Send(tui.LogEntryMsg{
+				Level:     level,
+				Timestamp: time.Now(),
+				Message:   msg,
+				Caller:    "",
+			})
 		}
 	}
 }
@@ -152,7 +123,11 @@ func StepHeader(stepNum int, title string) {
 		fmt.Printf("Step %d: %s\n", stepNum, title)
 		fmt.Printf("====================================================================\n\n")
 	}
-	Info(fmt.Sprintf("Starting Step %d: %s", stepNum, title))
+	
+	// Log directly to Logger to respect AddCallerSkip(1)
+	if Logger != nil {
+		Logger.Info(fmt.Sprintf("Starting Step %d: %s", stepNum, title))
+	}
 
 	// Send to TUI if available
 	if tuiMode && tuiProgram != nil {
@@ -188,7 +163,11 @@ func StepComplete(stepNum int, title string, startTime time.Time) {
 	if !tuiMode {
 		fmt.Printf("\n✓ Step %d completed in %d minutes and %d seconds\n", stepNum, minutes, seconds)
 	}
-	Info("Step completed", zap.String("step", title), zap.Duration("duration", duration))
+	
+	// Log directly to Logger
+	if Logger != nil {
+		Logger.Info("Step completed", zap.String("step", title), zap.Duration("duration", duration))
+	}
 
 	// Send step completion to TUI if available
 	if tuiMode && tuiProgram != nil {

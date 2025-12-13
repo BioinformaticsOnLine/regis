@@ -12,10 +12,35 @@ import (
 	"github.com/BioinformaticsOnLine/regis/config"
 )
 
+const (
+	MaxTableRows      = 1000 // Limit shown rows (User requested increase)
+	MaxCarouselImages = 500  // Limit carousel items (User requested increase)
+)
+
 // Link represents a hyperlink
 type Link struct {
 	Label string
 	URL   string
+}
+
+// ReportImage represents an image in the report with a label
+type ReportImage struct {
+	Path     string
+	Label    string
+	Sequence string
+	CPC2Data *CPC2Row
+}
+
+// CPC2Row represents a row in the CPC2 output table
+type CPC2Row struct {
+	ID               string
+	TranscriptLength string
+	PeptideLength    string
+	FickettScore     string
+	PI               string
+	ORFIntegrity     string
+	CodingProb       string
+	Label            string
 }
 
 // ModuleRenderData holds all info needed to render a module card in the HTML report
@@ -29,8 +54,11 @@ type ModuleRenderData struct {
 	Inputs      []string
 	Outputs     []string
 	Metrics     interface{} // The specific metric struct
-	Images      []string    // Paths to images to display (e.g. RNAfold structures)
+	Images      []ReportImage    // Paths to images to display (e.g. RNAfold structures)
+	TotalImages int         // Total available images (if > len(Images), show warning)
 	ExtraLinks  []Link      // Extra links (e.g. RSeQC PDF)
+	TableData   []CPC2Row   // For displaying tables (e.g. CPC2 output)
+	TotalRows   int         // Total available rows (if > len(TableData), show warning)
 }
 
 // PipelineInfo holds information about the pipeline execution
@@ -98,19 +126,14 @@ func copyAssetsToReportDir(cfg *config.Config, reportDir string) error {
 		}
 	}
 
-	// 2. Copy RNAfold PNGs (Top 4)
-	pngDir := filepath.Join(cfg.OutputDir, "09_rnafold", "png_files")
-	files, _ := os.ReadDir(pngDir)
-	count := 0
+	// 2. Copy RNAfold SVGs (All)
+	svgDir := filepath.Join(cfg.OutputDir, "09_rnafold", "svg_files")
+	files, _ := os.ReadDir(svgDir)
 	for _, f := range files {
-		if strings.HasSuffix(f.Name(), ".png") {
-			src := filepath.Join(pngDir, f.Name())
+		if strings.HasSuffix(f.Name(), ".svg") {
+			src := filepath.Join(svgDir, f.Name())
 			dst := filepath.Join(assetsDir, "rnafold", f.Name())
 			safeCopy(src, dst)
-			count++
-			if count >= 4 {
-				break
-			}
 		}
 	}
 
@@ -147,6 +170,76 @@ func copyAssetsToReportDir(cfg *config.Config, reportDir string) error {
 	}
 
 	return nil
+}
+
+// parseCPC2Output reads the CPC2 output file and returns rows and a map
+func parseCPC2Output(path string) ([]CPC2Row, map[string]CPC2Row, error) {
+	lines, err := os.ReadFile(path)
+	if err != nil {
+		return nil, nil, err
+	}
+	
+	var rows []CPC2Row
+	rowMap := make(map[string]CPC2Row)
+	
+	for i, line := range strings.Split(string(lines), "\n") {
+		if i == 0 || strings.TrimSpace(line) == "" {
+			continue // Skip header or empty
+		}
+		fields := strings.Fields(line)
+		if len(fields) < 8 {
+			continue
+		}
+		
+		row := CPC2Row{
+			ID:               fields[0],
+			TranscriptLength: fields[1],
+			PeptideLength:    fields[2],
+			FickettScore:     fields[3],
+			PI:               fields[4],
+			ORFIntegrity:     fields[5],
+			CodingProb:       fields[6],
+			Label:            fields[7],
+		}
+		rows = append(rows, row)
+		rowMap[row.ID] = row
+	}
+	return rows, rowMap, nil
+}
+
+// parseFasta reads a FASTA file into a map[header]sequence
+func parseFasta(path string) (map[string]string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	seqs := make(map[string]string)
+	var currentID string
+	var currentSeq strings.Builder
+
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		if strings.HasPrefix(line, ">") {
+			// Save previous
+			if currentID != "" {
+				seqs[currentID] = currentSeq.String()
+			}
+			// Start new
+			currentID = strings.TrimPrefix(strings.Fields(line)[0], ">")
+			currentSeq.Reset()
+		} else {
+			currentSeq.WriteString(line)
+		}
+	}
+	// Save last
+	if currentID != "" {
+		seqs[currentID] = currentSeq.String()
+	}
+	return seqs, nil
 }
 
 // loadLogoAsBase64 loads an image file and converts it to base64 data URI
@@ -351,6 +444,20 @@ func getModuleDetails(s *PipelineSummary, cfg *config.Config) []ModuleRenderData
 	}
 
 	// 5. CPC2
+	var cpc2Rows []CPC2Row
+	cpc2File := filepath.Join(cfg.OutputDir, "06_cpc2", "cpc2_output.txt")
+	allRows, _, err := parseCPC2Output(cpc2File)
+	
+	totalRows := 0
+	if err == nil {
+		totalRows = len(allRows)
+		if totalRows > MaxTableRows {
+			cpc2Rows = allRows[:MaxTableRows]
+		} else {
+			cpc2Rows = allRows
+		}
+	}
+
 	modules = append(modules, ModuleRenderData{
 		ID:       5,
 		Name:     "Coding Potential with CPC2",
@@ -367,7 +474,9 @@ func getModuleDetails(s *PipelineSummary, cfg *config.Config) []ModuleRenderData
 		Outputs: []string{
 			"06_cpc2/cpc2_output.txt",
 		},
-		Metrics: s.CPC2,
+		Metrics:   s.CPC2,
+		TableData: cpc2Rows,
+		TotalRows: totalRows,
 	})
 
 	// 6. CPAT
@@ -417,18 +526,38 @@ func getModuleDetails(s *PipelineSummary, cfg *config.Config) []ModuleRenderData
 	})
 
 	// 8. RNAfold
-	var rnaImages []string
-	pngDir := filepath.Join(cfg.OutputDir, "09_rnafold", "png_files")
-	files, _ := os.ReadDir(pngDir)
-	count := 0
+	var rnaImages []ReportImage
+	svgFolder := filepath.Join(cfg.OutputDir, "09_rnafold", "svg_files")
+	files, _ := os.ReadDir(svgFolder)
+
+	// Load sequences & CPC2 data for modal
+	seqs, _ := parseFasta(filepath.Join(cfg.OutputDir, "06_cpc2", "transcripts.fa"))
+	_, cpc2Map, _ := parseCPC2Output(filepath.Join(cfg.OutputDir, "06_cpc2", "cpc2_output.txt"))
+
 	for _, f := range files {
-		if strings.HasSuffix(f.Name(), ".png") {
-			rnaImages = append(rnaImages, "assets/rnafold/"+f.Name())
-			count++
-			if count >= 4 {
-				break
+		if strings.HasSuffix(f.Name(), ".svg") {
+			// Extract Label (filename without extension, e.g. STRG.1.1)
+			label := strings.TrimSuffix(f.Name(), "_ss.svg")
+			
+			img := ReportImage{
+				Path:     "assets/rnafold/" + f.Name(),
+				Label:    label,
+				Sequence: seqs[label],
 			}
+			
+			// Attach CPC2 data if available
+			if row, ok := cpc2Map[label]; ok {
+				img.CPC2Data = &row
+			}
+
+			rnaImages = append(rnaImages, img)
 		}
+	}
+
+	// Limit images
+	totalImages := len(rnaImages)
+	if totalImages > MaxCarouselImages {
+		rnaImages = rnaImages[:MaxCarouselImages]
 	}
 
 	modules = append(modules, ModuleRenderData{
@@ -446,7 +575,29 @@ func getModuleDetails(s *PipelineSummary, cfg *config.Config) []ModuleRenderData
 		},
 		Outputs: []string{
 			"09_rnafold/lncrna_structures.out",
-			"09_rnafold/png_files/*.png",
+			"09_rnafold/svg_files/*.svg",
+		},
+		Metrics:     s.RNAfold,
+		Images:      rnaImages,
+		TotalImages: totalImages,
+	})
+
+	modules = append(modules, ModuleRenderData{
+		ID:       8,
+		Name:     "Secondary Structure Prediction",
+		Icon:     "🌀",
+		Duration: getDuration("RNAfold"),
+		Status:   "Success",
+		Description: []string{
+			"Predicted minimum free energy (MFE) structures",
+			"Generated visualization images",
+		},
+		Inputs: []string{
+			"06_cpc2/transcripts.fa",
+		},
+		Outputs: []string{
+			"09_rnafold/lncrna_structures.out",
+			"09_rnafold/svg_files/*.svg",
 		},
 		Metrics: s.RNAfold,
 		Images:  rnaImages,
@@ -668,6 +819,7 @@ func getHTMLTemplate() string {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>REGIS Pipeline Report - {{.RunID}}</title>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@3.7.3/dist/full.css" rel="stylesheet" type="text/css" />
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -974,6 +1126,7 @@ func getHTMLTemplate() string {
                                     {{if eq .Name "Coding Potential with CPC2"}}
                                         {{with .Metrics}}
                                         <div class="flex justify-between text-sm"><span class="text-gray-600">Total:</span> <span class="font-medium">{{.TotalTranscripts}}</span></div>
+                                        <div class="flex justify-between text-sm"><span class="text-gray-600">Coding:</span> <span class="font-medium text-red-600">{{.CodingTranscripts}}</span></div>
                                         <div class="flex justify-between text-sm"><span class="text-gray-600">Noncoding:</span> <span class="font-medium text-green-600">{{.NoncodingTranscripts}}</span></div>
                                         {{end}}
                                     {{end}}
@@ -1054,17 +1207,79 @@ func getHTMLTemplate() string {
                         </div>
                     </div>
 
-                    <!-- Images (e.g. RNAfold) -->
-                    {{if .Images}}
+                        <!-- CPC2 Table -->
+                        {{if .TableData}}
+                        <div class="lg:col-span-3 mt-6">
+                            <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Analysis Results</h4>
+                            
+                             {{if gt .TotalRows (len .TableData)}}
+                            <div class="alert alert-warning text-xs py-2 mb-2 flex justify-between items-center rounded-lg border border-yellow-200 bg-yellow-50 text-yellow-800">
+                                <span>Showing first {{len .TableData}} of {{.TotalRows}} rows. Large datasets are truncated for performance.</span>
+                                {{range .Outputs}}
+                                    <span class="font-mono bg-white px-2 py-0.5 rounded border border-yellow-200">Full file: {{.}}</span>
+                                {{end}}
+                            </div>
+                            {{end}}
+
+                            <div class="overflow-x-auto max-h-96 border border-gray-100 rounded-lg">
+                                <table class="min-w-full divide-y divide-gray-200 text-sm">
+                                    <thead class="bg-gray-50 sticky top-0">
+                                        <tr>
+                                            <th class="px-4 py-2 text-left font-medium text-gray-500">ID</th>
+                                            <th class="px-4 py-2 text-left font-medium text-gray-500">Length</th>
+                                            <th class="px-4 py-2 text-left font-medium text-gray-500">Fickett</th>
+                                            <th class="px-4 py-2 text-left font-medium text-gray-500">pI</th>
+                                            <th class="px-4 py-2 text-left font-medium text-gray-500">Prob</th>
+                                            <th class="px-4 py-2 text-left font-medium text-gray-500">Label</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="bg-white divide-y divide-gray-200">
+                                        {{range .TableData}}
+                                        <tr class="hover:bg-gray-50">
+                                            <td class="px-4 py-2 font-mono text-gray-900">{{.ID}}</td>
+                                            <td class="px-4 py-2 text-gray-600">{{.TranscriptLength}}</td>
+                                            <td class="px-4 py-2 text-gray-600">{{.FickettScore}}</td>
+                                            <td class="px-4 py-2 text-gray-600">{{printf "%.2s" .PI}}</td> <!-- truncate if needed -->
+                                            <td class="px-4 py-2 text-gray-600">{{.CodingProb}}</td>
+                                            <td class="px-4 py-2">
+                                                <span class="px-2 py-0.5 rounded text-xs font-medium {{if eq .Label "noncoding"}}bg-green-100 text-green-800{{else}}bg-red-100 text-red-800{{end}}">
+                                                    {{.Label}}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                        {{end}}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        {{end}}
+
+                        <!-- Images (e.g. RNAfold) -->
+                        {{if .Images}}
                     <div class="px-6 pb-6">
-                        <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Sample Visualizations</h4>
-                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Structure Visualization Carousel</h4>
+                        
+                         {{if gt .TotalImages (len .Images)}}
+                        <div class="alert alert-info text-xs py-2 mb-2 rounded-lg bg-blue-50 text-blue-800 border border-blue-200">
+                           <span>Showing first {{len .Images}} of {{.TotalImages}} structures. Check <code>09_rnafold/svg_files/</code> for all.</span>
+                        </div>
+                        {{end}}
+
+                        <div class="carousel carousel-center max-w-full p-4 space-x-4 bg-gray-50 rounded-box border border-gray-100">
                             {{range .Images}}
-                            <div class="border border-gray-100 rounded-lg p-2 bg-gray-50 hover:shadow-md transition-shadow">
-                                <img src="{{.}}" alt="Structure" class="w-full h-auto rounded hover:scale-105 transition-transform cursor-pointer">
+                            <div class="carousel-item flex flex-col items-center">
+                                <div class="relative group cursor-pointer" 
+                                     onclick='openImageModal("{{.Path}}", "{{.Label}}", "{{.Sequence}}", {{if .CPC2Data}}{"prob": "{{.CPC2Data.CodingProb}}", "label": "{{.CPC2Data.Label}}", "len": "{{.CPC2Data.TranscriptLength}}"}{{else}}null{{end}})'>
+                                    <img src="{{.Path}}" class="rounded-box h-64 object-contain bg-white border border-gray-100 p-2 hover:scale-105 transition-transform" />
+                                    <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/10 rounded-box">
+                                        <span class="bg-black/75 text-white text-xs px-2 py-1 rounded">View Details</span>
+                                    </div>
+                                </div>
+                                <span class="text-xs font-mono text-gray-500 mt-2 bg-gray-100 px-2 py-0.5 rounded border border-gray-200">{{.Label}}</span>
                             </div>
                             {{end}}
                         </div>
+                        <p class="text-xs text-center text-gray-400 mt-2">Swipe or click to view full size</p>
                     </div>
                     {{end}}
                 </div>
@@ -1120,6 +1335,95 @@ func getHTMLTemplate() string {
             </div>
         </div>
     </footer>
+
+    <!-- Image Modal -->
+    <dialog id="image_modal" class="modal backdrop-blur-sm">
+        <form method="dialog" class="modal-box w-11/12 max-w-6xl h-[90vh] flex bg-white p-0 overflow-hidden shadow-2xl rounded-2xl">
+            
+            <!-- Left: Image -->
+            <div class="w-2/3 h-full bg-gray-50 flex flex-col border-r border-gray-100">
+                <div class="flex justify-between items-center p-4 border-b border-gray-100">
+                    <h3 id="modal_label" class="font-bold text-lg font-mono text-gray-800"></h3>
+                </div>
+                <div class="flex-1 flex items-center justify-center p-8 overflow-auto">
+                    <img id="modal_image" src="" alt="Structure" class="max-w-full max-h-full object-contain drop-shadow-lg" />
+                </div>
+                <div class="p-4 border-t border-gray-100 bg-white flex justify-end">
+                    <a id="modal_download" href="" download class="btn btn-sm btn-primary">Download SVG</a>
+                </div>
+            </div>
+
+            <!-- Right: Details -->
+            <div class="w-1/3 h-full bg-white flex flex-col overflow-y-auto">
+                <div class="flex justify-end p-2">
+                    <button class="btn btn-sm btn-circle btn-ghost text-gray-500 hover:bg-gray-100">✕</button>
+                </div>
+                
+                <div class="px-6 pb-6 space-y-6">
+                    <!-- CPC2 Data -->
+                    <div id="modal_cpc2_section" class="hidden">
+                        <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Coding Potential (CPC2)</h4>
+                        <div class="bg-blue-50 rounded-lg p-4 space-y-2">
+                            <div class="flex justify-between text-sm">
+                                <span class="text-gray-600">Label:</span>
+                                <span id="modal_cpc2_label" class="font-bold uppercase"></span>
+                            </div>
+                            <div class="flex justify-between text-sm">
+                                <span class="text-gray-600">Probability:</span>
+                                <span id="modal_cpc2_prob" class="font-mono"></span>
+                            </div>
+                            <div class="flex justify-between text-sm">
+                                <span class="text-gray-600">Length:</span>
+                                <span id="modal_cpc2_len" class="font-mono"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Sequence -->
+                    <div>
+                        <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Sequence (FASTA)</h4>
+                        <div class="relative">
+                            <pre id="modal_sequence" class="text-xs font-mono bg-gray-50 p-3 rounded-lg border border-gray-100 whitespace-pre-wrap break-all max-h-96 overflow-y-auto text-gray-600"></pre>
+                            <button type="button" onclick="copySequence()" class="absolute top-2 right-2 p-1 bg-white border border-gray-200 rounded hover:bg-gray-50 text-gray-500" title="Copy Sequence">
+                                📋
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </form>
+        <form method="dialog" class="modal-backdrop">
+            <button>close</button>
+        </form>
+    </dialog>
+
+    <script>
+        function openImageModal(src, label, sequence, cpc2Data) {
+            document.getElementById('modal_image').src = src;
+            document.getElementById('modal_label').innerText = label;
+            document.getElementById('modal_download').href = src;
+            document.getElementById('modal_sequence').innerText = sequence || "No sequence data available.";
+
+            // Handle CPC2 Data
+            const cpc2Section = document.getElementById('modal_cpc2_section');
+            if (cpc2Data) {
+                cpc2Section.classList.remove('hidden');
+                document.getElementById('modal_cpc2_label').innerText = cpc2Data.label;
+                document.getElementById('modal_cpc2_label').className = "font-bold uppercase " + (cpc2Data.label === "noncoding" ? "text-green-600" : "text-red-600");
+                document.getElementById('modal_cpc2_prob').innerText = cpc2Data.prob;
+                document.getElementById('modal_cpc2_len').innerText = cpc2Data.len + " nt";
+            } else {
+                cpc2Section.classList.add('hidden');
+            }
+
+            document.getElementById('image_modal').showModal();
+        }
+
+        function copySequence() {
+            const seq = document.getElementById('modal_sequence').innerText;
+            navigator.clipboard.writeText(seq);
+        }
+    </script>
 
     <!-- Charts JavaScript -->
     <script>

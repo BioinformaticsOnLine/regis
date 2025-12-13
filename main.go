@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"os"
 	"os/signal"
@@ -17,6 +16,7 @@ import (
 	"github.com/BioinformaticsOnLine/regis/tui"
 	"github.com/BioinformaticsOnLine/regis/utils"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/spf13/pflag"
 	"go.uber.org/zap"
 )
 
@@ -25,8 +25,8 @@ func main() {
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
 		case "serve":
-			serveCmd := flag.NewFlagSet("serve", flag.ExitOnError)
-			port := serveCmd.String("port", "3000", "Port to run the server on")
+			serveCmd := pflag.NewFlagSet("serve", pflag.ExitOnError)
+			port := serveCmd.StringP("port", "p", "3000", "Port to run the server on")
 			jobDir := serveCmd.String("job-dir", "./jobs", "Directory to store job outputs")
 			serveCmd.Parse(os.Args[2:])
 			api.StartServer(*port, *jobDir)
@@ -34,8 +34,7 @@ func main() {
 
 		case "submit_internal":
 			// Internal command used by Slurm jobs to execute the pipeline
-			// Usage: regis submit_internal --config /path/to/job_config.json
-			submitCmd := flag.NewFlagSet("submit_internal", flag.ExitOnError)
+			submitCmd := pflag.NewFlagSet("submit_internal", pflag.ExitOnError)
 			configPath := submitCmd.String("config", "", "Path to job configuration JSON")
 			submitCmd.Parse(os.Args[2:])
 
@@ -48,54 +47,72 @@ func main() {
 			return
 		}
 	}
-	// Define CLI flags matching bash script interface
-	dataType := flag.String("t", "", "Data type: 'single' or 'paired'")
-	method := flag.String("m", "", "Analysis method: 'denovo' or 'reference'")
-	file1 := flag.String("f1", "", "Input file 1 (or single-end file)")
-	file2 := flag.String("f2", "", "Input file 2 (for paired-end)")
-	reference := flag.String("r", "", "Reference genome FASTA file")
-	gtf := flag.String("g", "", "Annotation GTF/GFF file")
-	outputDir := flag.String("o", "", "Output directory")
 
-	// Optional flags
-	species := flag.String("s", "", "Species name for CPAT (Human, Mouse, Fly, Zebrafish)")
-	email := flag.String("e", "", "User email (optional)")
-	emailLong := flag.String("email", "", "User email (optional)")
-	cores := flag.Int("c", 0, "Number of CPU cores (default: all available)")
-	threads := flag.Int("p", 0, "Number of threads (alias for -c)")
+	// Define Root CLI flags
+	// We use pflag here which allows binding to koanf in config.Load
+	pflag.StringP("data_type", "t", "", "Data type: 'single' or 'paired'")
+	pflag.StringP("method", "m", "", "Analysis method: 'denovo' or 'reference'")
+	pflag.String("f1", "", "Input file 1 (or single-end file)")
+	pflag.String("f2", "", "Input file 2 (for paired-end)")
+	pflag.StringP("reference", "r", "", "Reference genome FASTA file")
+	pflag.StringP("gtf", "g", "", "Annotation GTF/GFF file")
+	pflag.StringP("output_dir", "o", "", "Output directory")
 
+	// Optional strings
+	pflag.StringP("species", "s", "", "Species name for CPAT (Human, Mouse, Fly, Zebrafish)")
+	pflag.StringP("email", "e", "", "User email (optional)")
+	pflag.IntP("threads", "c", 0, "Number of CPU cores (default: all available)")
+	
 	// CPAT flags
-	skipCPAT := flag.Bool("skip-cpat", false, "Force CPC2-only mode (skip CPAT)")
-	cpatHex := flag.String("cpat-hex", "", "Custom CPAT hexamer model file")
-	cpatLogit := flag.String("cpat-logit", "", "Custom CPAT logit model file")
+	pflag.Bool("skip_cpat", false, "Force CPC2-only mode (skip CPAT)")
+	pflag.String("cpat_hex", "", "Custom CPAT hexamer model file")
+	pflag.String("cpat_logit", "", "Custom CPAT logit model file")
 
 	// LncTar flags
-	lnctar := flag.Bool("lnctar", false, "Enable LncTar target prediction")
-	lnctarBest := flag.Bool("lnctar-best", false, "Run LncTar on best candidates only")
-	lnctarHighly := flag.Bool("lnctar-highly", false, "Run LncTar on highly expressed lncRNAs")
-	lnctarAll := flag.Bool("lnctar-all", false, "Run LncTar on all lncRNAs (comprehensive)")
-	lnctarComprehensive := flag.Bool("lnctar-comprehensive", false, "Alias for --lnctar-all")
+	pflag.Bool("lnctar", false, "Enable LncTar target prediction")
+	pflag.Bool("lnctar_best", false, "Run LncTar on best candidates only")
+	pflag.Bool("lnctar_highly", false, "Run LncTar on highly expressed lncRNAs")
+	pflag.Bool("lnctar_all", false, "Run LncTar on all lncRNAs (comprehensive)")
+	pflag.Bool("lnctar_comprehensive", false, "Alias for --lnctar-all")
 
 	// IntaRNA flags
-	intarna := flag.Bool("intarna", false, "Enable IntaRNA target prediction")
-	intarnaBest := flag.Bool("intarna-best", false, "Run IntaRNA on best candidates only")
-	intarnaHighly := flag.Bool("intarna-highly", false, "Run IntaRNA on highly expressed lncRNAs")
-	intarnaAll := flag.Bool("intarna-all", false, "Run IntaRNA on all lncRNAs (comprehensive)")
-	intarnaComprehensive := flag.Bool("intarna-comprehensive", false, "Alias for --intarna-all")
+	pflag.Bool("intarna", false, "Enable IntaRNA target prediction")
+	pflag.Bool("intarna_best", false, "Run IntaRNA on best candidates only")
+	pflag.Bool("intarna_highly", false, "Run IntaRNA on highly expressed lncRNAs")
+	pflag.Bool("intarna_all", false, "Run IntaRNA on all lncRNAs (comprehensive)")
+	pflag.Bool("intarna_comprehensive", false, "Alias for --intarna-all")
 
 	// rRNA filtering
-	sortmerna := flag.Bool("sortmerna", false, "Enable rRNA filtering with SortMeRNA (recommended)")
+	pflag.Bool("sortmerna", false, "Enable rRNA filtering (recommended)")
 
-	// Report generation flag
-	reportOnly := flag.String("report", "", "Generate summary report from existing output directory (path to output folder)")
+	// Config file
+	configFile := pflag.String("config", "", "Path to configuration file")
 
-	// Help flag
-	help := flag.Bool("help", false, "Show help message")
-	helpShort := flag.Bool("h", false, "Show help message")
+	// Report only
+	reportOnly := pflag.String("report", "", "Generate summary report from existing output directory")
 
-	flag.Parse()
+	// Help
+	help := pflag.BoolP("help", "h", false, "Show help message")
 
-	// Check if report-only mode
+	// Normalize flags: allow both underscores and hyphens (e.g. --lnctar-best works for --lnctar_best)
+	pflag.CommandLine.SetNormalizeFunc(func(f *pflag.FlagSet, name string) pflag.NormalizedName {
+		from := []string{"-", "_"}
+		to := "_"
+		for _, sep := range from {
+			name = strings.Replace(name, sep, to, -1)
+		}
+		return pflag.NormalizedName(name)
+	})
+
+	// Parse flags
+	pflag.Parse()
+
+	// Handle immediate actions
+	if *help {
+		tui.ShowBanner()
+		os.Exit(0)
+	}
+
 	if *reportOnly != "" {
 		if err := generateReportOnly(*reportOnly); err != nil {
 			fmt.Fprintf(os.Stderr, "Error generating report: %v\n", err)
@@ -105,99 +122,54 @@ func main() {
 		os.Exit(0)
 	}
 
-	// Show banner only if help flag is set
-	if *help || *helpShort {
-		tui.ShowBanner()
-		os.Exit(0)
+	// LOAD CONFIGURATION (Koanf)
+	// This merges Defaults + Config File + Env + Flags
+	cfg, err := config.Load(pflag.CommandLine, *configFile)
+	if err != nil {
+		fmt.Printf("Configuration error: %v\n", err)
+		os.Exit(1)
 	}
 
-	var cfg *config.Config
-	var err error
+	// DEBUG: Check if flags are loaded
+	// fmt.Printf("DEBUG CONFIG: Method='%s' DataType='%s' File1='%s' File2='%s' OutputDir='%s'\n", 
+	//	cfg.Method, cfg.DataType, cfg.File1, cfg.File2, cfg.OutputDir)
 
-	// Check if any pipeline flags were provided
-	// If no flags, launch interactive mode with forms
-	if *dataType == "" && *method == "" && *file1 == "" && *outputDir == "" {
-		// Interactive mode - show forms
+	// Interactive Mode Trigger
+	// If essential fields are missing, and no specific action requested, launch TUI wizard
+	if cfg.DataType == "" && cfg.Method == "" && cfg.File1 == "" && cfg.OutputDir == "" {
 		fmt.Println("Launching interactive mode...")
-		cfg, err = tui.CollectParameters()
+		// Note: TUI CollectParameters returns a *Config. 
+		// We might want to merge it? Or just use it.
+		// For now, TUI generates a fresh config.
+		interactiveCfg, err := tui.CollectParameters()
 		if err != nil {
 			fmt.Printf("Error collecting parameters: %v\n", err)
 			os.Exit(1)
 		}
+		cfg = interactiveCfg
 	} else {
-		// CLI mode - validate required flags
-		// Show help with logo if no arguments or essential flags are missing
-		if len(os.Args) == 1 || *dataType == "" || *method == "" || *outputDir == "" || *file1 == "" {
-			printBanner()
-			printUsage()
+		// CLI Mode Validation
+		if cfg.DataType == "" || cfg.Method == "" || cfg.OutputDir == "" || cfg.File1 == "" {
+			// Missing required flags
+			tui.ShowBanner()
+			fmt.Println("\n❌ Missing required arguments via CLI/Config/Env.")
+			if cfg.DataType == "" { fmt.Println("   • Missing: -t / --data_type") }
+			if cfg.Method == "" { fmt.Println("   • Missing: -m / --method") }
+			if cfg.File1 == "" { fmt.Println("   • Missing: --f1") }
+			if cfg.OutputDir == "" { fmt.Println("   • Missing: -o / --output_dir") }
 			os.Exit(1)
 		}
-
-		// Validate required flags
-		if *dataType != "single" && *dataType != "paired" {
-			fmt.Fprintf(os.Stderr, "Error: -t must be 'single' or 'paired'\n")
-			os.Exit(1)
+		
+		// Map 'Logic' fields to 'Enable' fields (compatibility with flags)
+		if cfg.LncTarBestOnly || cfg.LncTarComprehensive || cfg.LncTarHighly {
+			cfg.EnableLncTar = true
 		}
-
-		if *method != "denovo" && *method != "reference" {
-			fmt.Fprintf(os.Stderr, "Error: -m must be 'denovo' or 'reference'\n")
-			os.Exit(1)
-		}
-
-		if *dataType == "paired" && *file2 == "" {
-			fmt.Fprintf(os.Stderr, "Error: -f2 required for paired-end data\n")
-			os.Exit(1)
-		}
-
-		if *method == "reference" && (*reference == "" || *gtf == "") {
-			fmt.Fprintf(os.Stderr, "Error: -r and -g required for reference-based analysis\n")
-			os.Exit(1)
-		}
-
-		// Determine thread count (prefer -c over -p)
-		threadCount := *cores
-		if threadCount == 0 {
-			threadCount = *threads
-		}
-
-		// Handle email flag priority
-		if *emailLong != "" {
-			email = emailLong
-		}
-
-		cfg = &config.Config{
-			DataType:  *dataType,
-			Method:    *method,
-			File1:     *file1,
-			File2:     *file2,
-			Reference: *reference,
-			GTF:       *gtf,
-			OutputDir: *outputDir,
-			Threads:   threadCount,
-			Email:     *email,
-
-			// Species and CPAT options
-			Species:   *species,
-			SkipCPAT:  *skipCPAT,
-			CPATHex:   *cpatHex,
-			CPATLogit: *cpatLogit,
-
-			// LncTar settings
-			EnableLncTar:        *lnctar || *lnctarBest || *lnctarHighly || *lnctarAll || *lnctarComprehensive,
-			LncTarBestOnly:      *lnctarBest,
-			LncTarComprehensive: *lnctarAll || *lnctarComprehensive,
-
-			// IntaRNA settings
-			EnableIntaRNA:        *intarna || *intarnaBest || *intarnaHighly || *intarnaAll || *intarnaComprehensive,
-			IntaRNABestOnly:      *intarnaBest,
-			IntaRNAComprehensive: *intarnaAll || *intarnaComprehensive,
-
-			// rRNA filtering
-			EnableSortMeRNA: *sortmerna,
+		if cfg.IntaRNABestOnly || cfg.IntaRNAComprehensive || cfg.IntaRNAHighly {
+			cfg.EnableIntaRNA = true
 		}
 	}
 
-	// Enable TUI mode to suppress stdout printing (must be before InitLogger)
+	// Enable TUI mode to suppress stdout printing
 	utils.SetTUIMode(true)
 
 	// Initialize logger
@@ -213,7 +185,7 @@ func main() {
 	}
 	defer utils.Sync()
 
-	// Validate configuration
+	// Validate configuration (Business Logic)
 	if err := utils.ValidateConfig(cfg); err != nil {
 		fmt.Printf("Error: %v\n", err)
 		os.Exit(1)
@@ -224,7 +196,6 @@ func main() {
 	model := tui.NewModel(msgChan)
 	program := tea.NewProgram(model, tea.WithAltScreen(), tea.WithMouseCellMotion())
 
-	// Set TUI program reference for logger
 	utils.SetTUIProgram(program)
 
 	// Run pipeline in goroutine
@@ -234,24 +205,21 @@ func main() {
 
 		pipelineStart := time.Now()
 
-		// Send pipeline metadata to TUI
 		program.Send(tui.PipelineMetadataMsg{
 			StartTime:        time.Now(),
 			DataType:         cfg.DataType,
 			Method:           cfg.Method,
-			Cores:            cfg.Threads, // Assuming cfg.Threads is the correct field for cores
+			Cores:            cfg.Threads,
 			Species:          cfg.Species,
-			ValidationMode:   cfg.ValidationMode, // Assuming cfg.ValidationMode is the correct field
+			ValidationMode:   cfg.ValidationMode,
 			LncTarMode:       getLncTarMode(cfg),
 			IntaRNAMode:      getIntaRNAMode(cfg),
 			SortMeRNAEnabled: cfg.EnableSortMeRNA,
-			OriginalCommand:  strings.Join(os.Args, " "), // Full command line
+			OriginalCommand:  strings.Join(os.Args, " "),
 		})
 
-		// Run pipeline
 		err := runPipeline(ctx, cfg, program)
 
-		// Check if context was cancelled (user interrupted)
 		if ctx.Err() == context.Canceled {
 			program.Send(tui.PipelineCompleteMsg{
 				Success:  false,
@@ -265,11 +233,16 @@ func main() {
 			return
 		}
 
-		// Send completion message
 		duration := time.Since(pipelineStart)
+		failureReason := ""
+		if err != nil {
+			failureReason = err.Error()
+		}
+
 		program.Send(tui.PipelineCompleteMsg{
-			Success:  err == nil,
-			Duration: duration,
+			Success:       err == nil,
+			Duration:      duration,
+			FailureReason: failureReason,
 		})
 
 		if err != nil {
@@ -283,40 +256,41 @@ func main() {
 		}
 	}()
 
-	// Start TUI
 	finalModel, err := program.Run()
 
-	// Ignore "interrupted" error - this is expected when user quits gracefully
 	if err != nil && !strings.Contains(err.Error(), "interrupted") {
 		fmt.Printf("Error running TUI: %v\n", err)
 		os.Exit(1)
 	}
 
-	// Check if user requested shutdown (via 'q', 'ctrl+c', or 't')
-	// Show graceful shutdown animation after TUI exits
 	if m, ok := finalModel.(tui.Model); ok {
-		// If pipeline completed successfully, just exit
 		if m.PipelineSuccess {
 			fmt.Println("\n\033[32m✓ Pipeline execution completed successfully.\033[0m")
 			os.Exit(0)
 		}
 
-		// Only show shutdown if pipeline was running or user explicitly quit
 		cancelled := tui.ShowGracefulShutdown()
 
-		// If user cancelled the shutdown, keep the program running
+		if !m.PipelineSuccess && m.FailureReason != "" {
+			fmt.Println("\n\033[1;31m❌ PIPELINE FAILURE\033[0m")
+			parts := strings.SplitN(m.FailureReason, ": ", 2)
+			if len(parts) > 1 {
+				fmt.Printf("\033[31m   ├─ Context: %s\n", parts[0])
+				fmt.Printf("   ╰─ Reason:  %s\033[0m\n", parts[1])
+			} else {
+				fmt.Printf("\033[31m   ╰─ Reason: %s\033[0m\n", m.FailureReason)
+			}
+		}
+
 		if cancelled {
 			fmt.Println("\033[32m✓ Shutdown cancelled! Pipeline will continue running in background.\033[0m")
 			fmt.Println("\033[90mPress Ctrl+C when you're ready to exit.\033[0m")
 			fmt.Println()
 
-			// Wait indefinitely until user presses Ctrl+C again
-			// This allows the pipeline to continue running in the background
 			sigChan := make(chan os.Signal, 1)
 			signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 			<-sigChan
 
-			// Now kill the pipeline
 			fmt.Println()
 			fmt.Println("\033[33mTerminating pipeline processes...\033[0m")
 			p, _ := os.FindProcess(os.Getpid())
@@ -325,7 +299,6 @@ func main() {
 
 			fmt.Println("\033[36m(｡･ω･)ﾉﾞ Goodbye! Process terminated.\033[0m")
 		} else {
-			// Countdown completed without cancellation - kill pipeline now
 			p, _ := os.FindProcess(os.Getpid())
 			p.Signal(os.Interrupt)
 			time.Sleep(500 * time.Millisecond)
@@ -360,6 +333,14 @@ func getIntaRNAMode(cfg *config.Config) string {
 }
 
 func runPipeline(ctx context.Context, cfg *config.Config, program *tea.Program) error {
+	// Step 0: Dependency Check
+	tui.SendStepStart(program, 0, "Checking Dependencies", "dependency_check")
+	if err := modules.Step00CheckDependencies(ctx, cfg); err != nil {
+		tui.SendStepComplete(program, 0, false, 0)
+		return fmt.Errorf("dependency check failed: %w", err)
+	}
+	tui.SendStepComplete(program, 0, true, 0)
+
 	// Step 1: FastQC
 	tui.SendStepStart(program, 1, "Quality Control with FastQC", "fastqc")
 	if err := modules.Step01QCFastQC(ctx, cfg); err != nil {

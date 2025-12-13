@@ -1,0 +1,37 @@
+name: regis_dev
+channels:
+  - jitendralab
+  - bioconda
+  - conda-forge
+  - defaults
+dependencies:
+  # Build tools (from requirements: build)
+  - go=1.25
+  - clang_osx-64  # macOS C compiler (equivalent to compiler('c'))
+  - make
+
+  # Runtime dependencies (from requirements: run)
+  - python=3.10
+  - fastqc>=0.12.1
+  - trimmomatic>=0.39
+  - sortmerna>=4.3.4
+  - trinity>=2.15.2
+  - hisat2>=2.2.1
+  - samtools>=1.22.1
+  - stringtie=2.1.7
+  - gffread>=0.12.7
+  - cpc2_standalone
+  - libsvm
+  - viennarna
+  - gffcompare
+  - seqkit
+  - bedtools
+  - bedops
+  - ucsc-gtftogenepred
+  - ucsc-genepredtobed
+  - subread
+  - cpat
+  - intarna
+  - rseqc
+  - multiqc
+  - igv-reports

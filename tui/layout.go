@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/BioinformaticsOnLine/regis/version"
 )
 
 // Color palette
@@ -169,7 +170,7 @@ func renderLogo(m Model) string {
 	subtitle2 := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#FFD700")).
 		Italic(true).
-		Render("lncRNA Discovery Pipeline v1.0")
+		Render("lncRNA Discovery Pipeline v" + version.Version)
 
 	// Contact and attribution info - compact
 	bugs := lipgloss.NewStyle().
@@ -178,13 +179,9 @@ func renderLogo(m Model) string {
 
 	organization := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#6272A4")).
-		Render("Jitendralab • CNRS-Sorbonne • CSIR-IGIB")
+		Render("Regis Team • CNRS-Sorbonne • CSIR-IGIB")
 
-	pis := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#6272A4")).
-		Render("PIs: Dr. J. Narayan & Dr. S. Tiozzo")
-
-	return staticLogo + "\n" + subtitle1 + "\n" + subtitle2 + "\n" + bugs + "\n" + organization + "\n" + pis
+	return staticLogo + "\n" + subtitle1 + "\n" + subtitle2 + "\n" + bugs + "\n" + organization
 }
 
 // renderCommandTab renders the USER COMMAND TAB with full details
@@ -286,7 +283,8 @@ func renderStepBanner(m Model) string {
 	colors := []string{"#00D9FF", "#00FFFF", "#00FF80", "#50FA7B", "#FFB86C", "#FF79C6"}
 
 	// Get current and next color for smooth transition
-	colorIndex := (m.currentStep - 1) % len(colors)
+	// Use currentStep directly to handle Step 0 (Dependency Check) correctly
+	colorIndex := m.currentStep % len(colors)
 	nextColorIndex := (colorIndex + 1) % len(colors)
 
 	currentColor := colors[colorIndex]
@@ -332,7 +330,7 @@ func renderStepBanner(m Model) string {
 		timeStyle := lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#BD93F9")).
 			Italic(true)
-		timeInfo = " " + timeStyle.Render(fmt.Sprintf("(%s elapsed)", timeStr))
+		timeInfo = " " + timeStyle.Render(fmt.Sprintf("(Step Time: %s)", timeStr))
 	}
 
 	return banner + timeInfo + progressSection
@@ -393,15 +391,15 @@ func renderSystemMetrics(m Model) string {
 		Foreground(lipgloss.Color("#6272A4")).
 		Render("  |  ")
 
-	// Add elapsed time if step is running
+	// Add elapsed time (total pipeline time)
 	timeText := ""
-	if !m.stepStartTime.IsZero() {
-		elapsed := time.Since(m.stepStartTime)
+	if !m.metadata.StartTime.IsZero() {
+		elapsed := time.Since(m.metadata.StartTime)
 		timeStr := formatDuration(elapsed)
 		timeText = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#BD93F9")).
 			Italic(true).
-			Render(fmt.Sprintf("  |  Time: %s", timeStr))
+			Render(fmt.Sprintf("  |  Total Time: %s", timeStr))
 	}
 
 	// Add hint for fullscreen logs

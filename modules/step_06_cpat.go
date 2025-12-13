@@ -17,6 +17,7 @@ func Step06CPAT(ctx context.Context, cfg *config.Config) error {
 	stepStart := time.Now()
 	utils.StepHeader(6, "Cross-Validation with CPAT")
 
+
 	// Create validation directory
 	validationDir := filepath.Join(cfg.OutputDir, "07_validation")
 	if err := utils.CreateDirs(validationDir); err != nil {

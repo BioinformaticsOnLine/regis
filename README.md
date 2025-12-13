@@ -104,7 +104,11 @@ REGIS relies on several external bioinformatics tools. We recommend using **Cond
     # Activate environment
     conda activate regis
     ```
+    ```
     *Note: CPC2, CPAT, LncTar, and IntaRNA may require manual installation or specific bioconda recipes.*
+
+> [!WARNING]
+> **Apple Silicon (M1/M2/M3) Users**: The `sortmerna` binary from Bioconda uses AVX2 instructions incompatible with Rosetta 2, causing a crash. Please **omit** the `--sortmerna` flag when running REGIS on macOS ARM systems, or run the pipeline inside a Docker container (x86_64).
 
 ### Build from Source
 ```bash

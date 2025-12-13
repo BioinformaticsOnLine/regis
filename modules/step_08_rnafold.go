@@ -14,17 +14,18 @@ import (
 	"go.uber.org/zap"
 )
 
-// Step07RNAfold predicts lncRNA secondary structures using RNAfold
+// Step08RNAfold predicts lncRNA secondary structures using RNAfold
 func Step08RNAfold(ctx context.Context, cfg *config.Config) error {
 	stepStart := time.Now()
 	utils.StepHeader(8, "lncRNA Secondary Structure Prediction")
 
 	// Create directories
 	rnafoldDir := filepath.Join(cfg.OutputDir, "09_rnafold")
-	psDir := filepath.Join(rnafoldDir, "ps_files")
-	pngDir := filepath.Join(rnafoldDir, "png_files")
+	// psDir := filepath.Join(rnafoldDir, "ps_files") // Deprecated
+	// pngDir := filepath.Join(rnafoldDir, "png_files") // Deprecated
+	svgDir := filepath.Join(rnafoldDir, "svg_files")
 
-	if err := utils.CreateDirs(rnafoldDir, psDir, pngDir); err != nil {
+	if err := utils.CreateDirs(rnafoldDir, svgDir); err != nil {
 		return fmt.Errorf("failed to create RNAfold directories: %w", err)
 	}
 
@@ -51,21 +52,21 @@ func Step08RNAfold(ctx context.Context, cfg *config.Config) error {
 	}
 
 	// Run RNAfold with input redirection
+	// Use --noPS to avoid generating PostScript files (we will generate SVGs with RNAplot)
 	outputFile := filepath.Join(rnafoldDir, "lncrna_structures.out")
 	if err := runRNAfold(ctx, transcriptsFa, outputFile); err != nil {
 		return fmt.Errorf("RNAfold failed: %w", err)
 	}
 
-	// Organize PS files and convert to PNG
-	utils.ShowProgress("Organizing files and converting PS to PNG")
-	if err := organizeAndConvertPS(rnafoldDir, psDir, pngDir); err != nil {
-		utils.Warn("PS to PNG conversion failed", zap.Error(err))
+	// Generate SVGs using RNAplot
+	utils.ShowProgress("Generating SVG visualizations with RNAplot")
+	if err := generateSVGs(ctx, outputFile, svgDir); err != nil {
+		utils.Warn("SVG generation failed", zap.Error(err))
 	}
 
-	utils.StepComplete(7, "lncRNA Secondary Structure Prediction", stepStart)
+	utils.StepComplete(8, "lncRNA Secondary Structure Prediction", stepStart)
 	utils.Info("Structure prediction complete",
-		zap.String("ps_files", psDir),
-		zap.String("png_files", pngDir),
+		zap.String("svg_files", svgDir),
 		zap.String("structures", outputFile))
 
 	return nil
@@ -87,14 +88,15 @@ func runRNAfold(ctx context.Context, inputFile, outputFile string) error {
 	defer output.Close()
 
 	// Run RNAfold with stdin/stdout redirection
-	cmd := exec.CommandContext(ctx, "RNAfold")
+	// --noPS: Don't produce PS files automatically
+	cmd := exec.CommandContext(ctx, "RNAfold", "--noPS")
 	cmd.Stdin = bytes.NewReader(input)
 	cmd.Stdout = output
 
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 
-	utils.Info("Running RNAfold")
+	utils.Info("Running RNAfold (MFE calculation)")
 
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("RNAfold failed: %w\nStderr: %s", err, stderr.String())
@@ -103,38 +105,41 @@ func runRNAfold(ctx context.Context, inputFile, outputFile string) error {
 	return nil
 }
 
-// organizeAndConvertPS moves PS files and converts them to PNG
-func organizeAndConvertPS(rnafoldDir, psDir, pngDir string) error {
-	// Find all .ps files in rnafold directory
-	files, err := filepath.Glob(filepath.Join(rnafoldDir, "*.ps"))
+// generateSVGs uses RNAplot to convert structure output to SVG
+func generateSVGs(ctx context.Context, structureFile, svgDir string) error {
+	// Read the structure file (contains Sequence + Structure + Energy)
+	input, err := os.ReadFile(structureFile)
 	if err != nil {
 		return err
 	}
 
-	for _, psFile := range files {
-		baseName := filepath.Base(psFile)
+	// We can feed the structure file directly to RNAplot
+	// RNAplot -f svg
+	cmd := exec.CommandContext(ctx, "RNAplot", "--output-format=svg")
+	cmd.Stdin = bytes.NewReader(input)
+	
+	// RNAplot writes to current directory, so we should be in rnafoldDir already (from Step08RNAfold)
+	
+	utils.Info("Running RNAplot (SVG generation)")
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("RNAplot failed: %w", err)
+	}
 
-		// Move PS file
-		newPSPath := filepath.Join(psDir, baseName)
-		if err := os.Rename(psFile, newPSPath); err != nil {
-			utils.Warn(fmt.Sprintf("Failed to move %s", baseName), zap.Error(err))
-			continue
-		}
+	// Move all generated .svg files to svgDir
+	files, err := filepath.Glob("*_ss.svg")
+	if err != nil {
+		return err
+	}
 
-		// Convert to PNG using ImageMagick
-		pngName := baseName[:len(baseName)-3] + ".png"
-		pngPath := filepath.Join(pngDir, pngName)
-
-		// magick ps_file -density 300 -background white -flatten png_file
-		cmd := exec.Command("magick", newPSPath,
-			"-density", "300",
-			"-background", "white",
-			"-flatten", pngPath)
-
-		if err := cmd.Run(); err != nil {
-			utils.Warn(fmt.Sprintf("Failed to convert %s to PNG", baseName), zap.Error(err))
+	for _, file := range files {
+		destPath := filepath.Join(svgDir, file)
+		if err := os.Rename(file, destPath); err != nil {
+			utils.Warn("Failed to move SVG file", zap.String("file", file), zap.Error(err))
 		}
 	}
+
+	count := len(files)
+	utils.Info(fmt.Sprintf("Generated %d SVG structure plots", count))
 
 	return nil
 }

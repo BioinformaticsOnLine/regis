@@ -28,6 +28,13 @@ func (p *PipelineRunner) RunHeadless(ctx context.Context) error {
 	cfg := p.Config
 	utils.Info("Starting Headless Pipeline Execution")
 
+	// Step 0: Dependency Check
+	if err := runStep(ctx, 0, "Checking Dependencies", func() error {
+		return Step00CheckDependencies(ctx, cfg)
+	}); err != nil {
+		return err
+	}
+
 	// Step 1: FastQC
 	if err := runStep(ctx, 1, "Quality Control with FastQC", func() error {
 		return Step01QCFastQC(ctx, cfg)
@@ -158,7 +165,7 @@ func (p *PipelineRunner) RunHeadless(ctx context.Context) error {
 func runStep(ctx context.Context, stepNum int, name string, fn func() error) error {
 	start := time.Now()
 	// Logic matches utils.StepHeader but ensures we log even if utils doesn't
-	utils.Info(fmt.Sprintf("Starting Step %d: %s", stepNum, name))
+	// utils.Info(fmt.Sprintf("Starting Step %d: %s", stepNum, name))
 
 	if err := fn(); err != nil {
 		utils.Error(fmt.Sprintf("Step %d failed: %v", stepNum, err))

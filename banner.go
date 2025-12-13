@@ -1,6 +1,10 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/BioinformaticsOnLine/regis/version"
+)
 
 // printBanner displays the REGIS logo and contact information
 func printBanner() {
@@ -19,7 +23,7 @@ func printBanner() {
   ╚═╝  ╚═╝╚══════╝ ╚═════╝ ╚═╝╚══════╝` + reset)
 
 	fmt.Println(gold + "  RNA-seq Guided Identification System")
-	fmt.Println("  lncRNA Discovery Pipeline v1.0" + reset)
+	fmt.Println("  lncRNA Discovery Pipeline v" + version.Version + reset)
 	fmt.Println(gray + "  Bugs: github.com/pranjalpruthi")
 	fmt.Println("  Jitendralab CSIR IGIB | PI: Dr. Jitendra Narayan" + reset)
 	fmt.Println()

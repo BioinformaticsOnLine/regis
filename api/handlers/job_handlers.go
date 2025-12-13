@@ -11,8 +11,10 @@ import (
 	"github.com/BioinformaticsOnLine/regis/config"
 	"github.com/BioinformaticsOnLine/regis/modules"
 	"github.com/BioinformaticsOnLine/regis/utils"
+	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
+	"maragu.dev/goqite"
 )
 
 // BaseJobDir is the directory where jobs will be stored if no output dir is provided
@@ -29,13 +31,7 @@ type Job struct {
 	Error      string         `json:"error,omitempty"`
 }
 
-var (
-	// JobQueue is still used for in-memory worker processing of new submissions
-	// In a more robust system, we might poll the DB for "queued" jobs on startup
-	JobQueue = make(chan *Job, 100)
-)
-
-// InitWorker starts the background worker that processes jobs
+// InitWorker starts the background worker that processes jobs from the persistent queue
 func InitWorker() {
 	// Ensure base job dir exists
 	if err := os.MkdirAll(BaseJobDir, 0755); err != nil {
@@ -43,8 +39,42 @@ func InitWorker() {
 	}
 
 	go func() {
-		for job := range JobQueue {
-			processJob(job)
+		ctx := context.Background()
+		for {
+			// Poll queue for new jobs
+			msg, err := Queue.Receive(ctx)
+			if err != nil {
+				// Log error and wait a bit before retrying (backoff)
+				fmt.Printf("Error receiving from queue: %v\n", err)
+				time.Sleep(5 * time.Second)
+				continue
+			}
+
+			// If no message, wait and retry
+			if msg == nil {
+				time.Sleep(1 * time.Second)
+				continue
+			}
+
+			// Parse Job ID from message body
+			jobID := string(msg.Body)
+
+			// Fetch Job from DB
+			var job Job
+			if err := db.GetDB().First(&job, "id = ?", jobID).Error; err != nil {
+				fmt.Printf("Error fetching job %s: %v. Deleting message.\n", jobID, err)
+				// Delete 'poison' message so we don't loop forever
+				_ = Queue.Delete(ctx, msg.ID)
+				continue
+			}
+
+			// Process
+			processJob(&job)
+
+			// Delete message from queue after processing
+			if err := Queue.Delete(ctx, msg.ID); err != nil {
+				fmt.Printf("Failed to delete message %s: %v\n", msg.ID, err)
+			}
 		}
 	}()
 }
@@ -138,7 +168,17 @@ func failJob(job *Job, msg string) {
 	db.GetDB().Save(job)
 }
 
-// SubmitJob handles new job submissions
+// SubmitJob submits a new pipeline job
+// @Summary Submit a new job
+// @Description Submit a job with the provided configuration. Requires strictly validated JSON payload.
+// @Tags jobs
+// @Accept json
+// @Produce json
+// @Param job body config.Config true "Job Configuration"
+// @Success 202 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /jobs/submit [post]
 func SubmitJob(c *fiber.Ctx) error {
 	// Parse request body into Config
 	cfg := new(config.Config)
@@ -148,27 +188,38 @@ func SubmitJob(c *fiber.Ctx) error {
 		})
 	}
 
+	// VALIDATE INPUT using go-playground/validator
+	validate := validator.New()
+	if err := validate.Struct(cfg); err != nil {
+		// Return friendly validation errors
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error":   "Validation failed",
+			"details": err.Error(),
+		})
+	}
+
 	jobID := uuid.New().String()
 
 	// Handle Output Directory
 	// If OutputDir is empty, create a new folder in BaseJobDir using the UUID
 	if cfg.OutputDir == "" {
 		cfg.OutputDir = filepath.Join(BaseJobDir, jobID)
-		// Ensure absolute path for safety?
-		// For now simple relative path is fine, but absolute is safer for tools
 		if absPath, err := filepath.Abs(cfg.OutputDir); err == nil {
 			cfg.OutputDir = absPath
 		}
 	}
 
-	// Enforce Email for API submissions (Security Policy)
+	// Apply Defaults (ValidationMode, etc.)
+	cfg.EnsureDefaults()
+
+	// Enforce Email (redundant check if validator works, but good for custom error)
 	if cfg.Email == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "email is required for API job submission",
 		})
 	}
 
-	// Validate configuration
+	// Validate configuration logic (legacy check)
 	if err := utils.ValidateConfig(cfg); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": fmt.Sprintf("Invalid configuration: %v", err),
@@ -188,8 +239,15 @@ func SubmitJob(c *fiber.Ctx) error {
 		})
 	}
 
-	// Send to worker
-	JobQueue <- job
+	// Send to Persistent Queue
+	err := Queue.Send(context.Background(), goqite.Message{
+		Body: []byte(jobID),
+	})
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": fmt.Sprintf("Failed to enqueue job: %v", err),
+		})
+	}
 
 	return c.Status(fiber.StatusAccepted).JSON(fiber.Map{
 		"job_id":     jobID,
@@ -200,6 +258,14 @@ func SubmitJob(c *fiber.Ctx) error {
 }
 
 // GetJobStatus returns the status of a specific job
+// @Summary Get job status
+// @Description Get the current status of a job by UUID
+// @Tags jobs
+// @Produce json
+// @Param uuid path string true "Job UUID"
+// @Success 200 {object} Job
+// @Failure 404 {object} map[string]interface{}
+// @Router /jobs/{uuid}/status [get]
 func GetJobStatus(c *fiber.Ctx) error {
 	jobID := c.Params("uuid")
 
@@ -214,6 +280,15 @@ func GetJobStatus(c *fiber.Ctx) error {
 }
 
 // GetJobResults returns the results summary for a job
+// @Summary Get job results
+// @Description Get the result summary/paths for a completed job
+// @Tags jobs
+// @Produce json
+// @Param uuid path string true "Job UUID"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 404 {object} map[string]interface{}
+// @Router /jobs/{uuid}/results [get]
 func GetJobResults(c *fiber.Ctx) error {
 	jobID := c.Params("uuid")
 
@@ -237,3 +312,5 @@ func GetJobResults(c *fiber.Ctx) error {
 		"status":     "completed",
 	})
 }
+
+

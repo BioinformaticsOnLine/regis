@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/yourusername/regis-go/config"
-	"github.com/yourusername/regis-go/utils"
+	"github.com/BioinformaticsOnLine/regis/config"
+	"github.com/BioinformaticsOnLine/regis/utils"
 	"go.uber.org/zap"
 )
 

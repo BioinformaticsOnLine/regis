@@ -107,11 +107,7 @@ func runLncTarBestCandidates(ctx context.Context, cfg *config.Config, lnctarDir,
 	lncRNAFa := filepath.Join(gtfDir, "filtered", "lncrna_filtered.fa")
 	bestCandidatesFa := filepath.Join(lnctarDir, "best_candidates.fa")
 
-	if err := utils.RunCommand(ctx, "seqkit", "grep",
-		"-f", bestCandidatesFile,
-		lncRNAFa,
-		"-o", bestCandidatesFa,
-	); err != nil {
+	if err := utils.ExtractSequences("Step09-Best", bestCandidatesFile, lncRNAFa, bestCandidatesFa); err != nil {
 		return err
 	}
 

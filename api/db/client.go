@@ -1,6 +1,7 @@
 package db
 
 import (
+	"database/sql"
 	"log"
 	"os"
 	"path/filepath"
@@ -33,4 +34,9 @@ func Init(dbName string) {
 // GetDB returns the database instance
 func GetDB() *gorm.DB {
 	return DB
+}
+
+// GetSqlDB returns the underlying sql.DB connection
+func GetSqlDB() (*sql.DB, error) {
+	return DB.DB()
 }
