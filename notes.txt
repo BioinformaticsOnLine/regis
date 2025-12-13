@@ -14,4 +14,19 @@
   --f2 /Users/pranjalpruthi/Documents/GitHub/regis-data/sample/in/SRR10341223_reverse.fastqsanger \
   --lnctar-best
 
- CGO_ENABLED=1 CC=/Users/pranjalpruthi/mambaforge/envs/regis_dev/bin/x86_64-apple-darwin13.4.0-clang /Users/pranjalpruthi/mambaforge/envs/regis_dev/bin/go build -o regis;
+
+CGO_ENABLED=1 CC=/Users/pranjalpruthi/mambaforge/envs/regis_dev/bin/x86_64-apple-darwin13.4.0-clang /Users/pranjalpruthi/mambaforge/envs/regis_dev/bin/go build -o regis;
+
+curl -X POST http://localhost:3000/api/v1/jobs/submit \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: <YOUR_KEY_FROM_SERVER_LOG>" \
+  -d @local_job.json
+
+
+./regis -t paired -m reference \
+  -r "/home/ajay/Desktop/Workspace_Pranjal/sample/in/GCA_907165135.1_OKI2018_I68_1.0_genomic.fna" \
+  -g "/home/ajay/Desktop/Workspace_Pranjal/sample/in/GCA_907165135.1_OKI2018_I68_1.0_genomic.gff" \
+  -o "out_linux_test_cli" \
+  --f1 "/home/ajay/Desktop/Workspace_Pranjal/sample/in/SRR10341223_forward.fastqsanger" \
+  --f2 "/home/ajay/Desktop/Workspace_Pranjal/sample/in/SRR10341223_reverse.fastqsanger" \
+  --lnctar-best
