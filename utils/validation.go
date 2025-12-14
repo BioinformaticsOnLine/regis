@@ -190,26 +190,26 @@ func ValidateInputFiles(files ...string) error {
 // 2. $CONDA_PREFIX/share/regis/assets (conda installation)
 // 3. executable_dir/../share/regis/assets (relative to binary)
 func FindAssetsDir() string {
-	// 1. Check current directory (development mode)
-	if FileExists("./assets/models") {
-		return "./assets"
+	// 1. Check relative to executable (for relocated binary)
+	if exePath, err := os.Executable(); err == nil {
+		exeDir := filepath.Dir(exePath)
+		relativeAssets := filepath.Join(exeDir, "..", "share", "regis", "assets")
+		if DirExists(filepath.Join(relativeAssets, "models")) {
+			return relativeAssets
+		}
 	}
 
 	// 2. Check CONDA_PREFIX (conda installation)
 	if condaPrefix := os.Getenv("CONDA_PREFIX"); condaPrefix != "" {
 		condaAssets := filepath.Join(condaPrefix, "share", "regis", "assets")
-		if FileExists(filepath.Join(condaAssets, "models")) {
+		if DirExists(filepath.Join(condaAssets, "models")) {
 			return condaAssets
 		}
 	}
 
-	// 3. Check relative to executable (for relocated binary)
-	if exePath, err := os.Executable(); err == nil {
-		exeDir := filepath.Dir(exePath)
-		relativeAssets := filepath.Join(exeDir, "..", "share", "regis", "assets")
-		if FileExists(filepath.Join(relativeAssets, "models")) {
-			return relativeAssets
-		}
+	// 3. Check current directory (fallback/development mode)
+	if DirExists("./assets/models") {
+		return "./assets"
 	}
 
 	// Fallback to ./assets (will fail validation if not found)

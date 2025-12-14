@@ -33,3 +33,10 @@ curl -X POST http://localhost:3000/api/v1/jobs/submit \
 
 conda build . --output-folder ./conda-bld/ -c bioconda -c conda-forge -c jitendralab
 CONDA_SUBDIR=osx-64 conda build . --output-folder ./conda-bld/ -c bioconda -c conda-forge -c jitendralab
+
+git add .
+git commit -m "Release v1.0.2: Fix asset path resolution for Conda"
+git tag v1.0.2
+git push origin main --tags
+
+git pull origin main

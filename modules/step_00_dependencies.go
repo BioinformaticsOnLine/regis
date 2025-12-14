@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 
 	"github.com/BioinformaticsOnLine/regis/config"
@@ -74,18 +73,14 @@ func Step00CheckDependencies(ctx context.Context, cfg *config.Config) error {
 			missingTools = append(missingTools, "cpat.py")
 		}
 
-		// Check local models
-		// Assuming assets are relative to where the binary is run or in a known location
-		// For now, we check the 'assets/models' directory in the current working directory
+		// Check keys exist in config (already validated/set by FindAssetsDir in validation.go)
 		if cfg.Species != "" {
-			hexamerFile := filepath.Join("assets", "models", fmt.Sprintf("%s_Hexamer.tsv", cfg.Species))
-			logitFile := filepath.Join("assets", "models", fmt.Sprintf("%s_logitModel.RData", cfg.Species))
-
-			if _, err := os.Stat(hexamerFile); os.IsNotExist(err) {
-				missingTools = append(missingTools, fmt.Sprintf("CPAT Hexamer Model (%s)", hexamerFile))
+			// Use the resolved paths from config
+			if _, err := os.Stat(cfg.CPATHexamerFile); os.IsNotExist(err) {
+				missingTools = append(missingTools, fmt.Sprintf("CPAT Hexamer Model (%s)", cfg.CPATHexamerFile))
 			}
-			if _, err := os.Stat(logitFile); os.IsNotExist(err) {
-				missingTools = append(missingTools, fmt.Sprintf("CPAT Logit Model (%s)", logitFile))
+			if _, err := os.Stat(cfg.CPATLogitFile); os.IsNotExist(err) {
+				missingTools = append(missingTools, fmt.Sprintf("CPAT Logit Model (%s)", cfg.CPATLogitFile))
 			}
 		}
 	}
@@ -105,10 +100,9 @@ func Step00CheckDependencies(ctx context.Context, cfg *config.Config) error {
 			missingTools = append(missingTools, "perl (for LncTar)")
 		}
 
-		// Check for bundled script
-		lncTarScript := filepath.Join("assets", "lnctar", "LncTar.pl")
-		if _, err := os.Stat(lncTarScript); os.IsNotExist(err) {
-			missingTools = append(missingTools, fmt.Sprintf("LncTar script (%s)", lncTarScript))
+		// Check for bundled script using config path
+		if _, err := os.Stat(cfg.LncTarScript); os.IsNotExist(err) {
+			missingTools = append(missingTools, fmt.Sprintf("LncTar script (%s)", cfg.LncTarScript))
 		}
 	}
 

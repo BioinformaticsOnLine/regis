@@ -53,12 +53,12 @@ type ModuleRenderData struct {
 	Description []string
 	Inputs      []string
 	Outputs     []string
-	Metrics     interface{} // The specific metric struct
-	Images      []ReportImage    // Paths to images to display (e.g. RNAfold structures)
-	TotalImages int         // Total available images (if > len(Images), show warning)
-	ExtraLinks  []Link      // Extra links (e.g. RSeQC PDF)
-	TableData   []CPC2Row   // For displaying tables (e.g. CPC2 output)
-	TotalRows   int         // Total available rows (if > len(TableData), show warning)
+	Metrics     interface{}   // The specific metric struct
+	Images      []ReportImage // Paths to images to display (e.g. RNAfold structures)
+	TotalImages int           // Total available images (if > len(Images), show warning)
+	ExtraLinks  []Link        // Extra links (e.g. RSeQC PDF)
+	TableData   []CPC2Row     // For displaying tables (e.g. CPC2 output)
+	TotalRows   int           // Total available rows (if > len(TableData), show warning)
 }
 
 // PipelineInfo holds information about the pipeline execution
@@ -116,13 +116,16 @@ func copyAssetsToReportDir(cfg *config.Config, reportDir string) error {
 	}
 
 	// 1. Copy logos
+	// 1. Copy logos
 	logoFiles := []string{
-		"assets/logo/regis-square-logo.png",
-		"assets/logo/jnlab-logo_long_form.png",
+		"regis-square-logo.png",
+		"jnlab-logo_long_form.png",
 	}
-	for _, logoFile := range logoFiles {
-		if _, err := os.Stat(logoFile); err == nil {
-			safeCopy(logoFile, filepath.Join(assetsDir, "logos", filepath.Base(logoFile)))
+	for _, filename := range logoFiles {
+		// Use cfg.AssetsDir to find the source file
+		srcPath := filepath.Join(cfg.AssetsDir, "logo", filename)
+		if _, err := os.Stat(srcPath); err == nil {
+			safeCopy(srcPath, filepath.Join(assetsDir, "logos", filename))
 		}
 	}
 
@@ -178,10 +181,10 @@ func parseCPC2Output(path string) ([]CPC2Row, map[string]CPC2Row, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	
+
 	var rows []CPC2Row
 	rowMap := make(map[string]CPC2Row)
-	
+
 	for i, line := range strings.Split(string(lines), "\n") {
 		if i == 0 || strings.TrimSpace(line) == "" {
 			continue // Skip header or empty
@@ -190,7 +193,7 @@ func parseCPC2Output(path string) ([]CPC2Row, map[string]CPC2Row, error) {
 		if len(fields) < 8 {
 			continue
 		}
-		
+
 		row := CPC2Row{
 			ID:               fields[0],
 			TranscriptLength: fields[1],
@@ -447,7 +450,7 @@ func getModuleDetails(s *PipelineSummary, cfg *config.Config) []ModuleRenderData
 	var cpc2Rows []CPC2Row
 	cpc2File := filepath.Join(cfg.OutputDir, "06_cpc2", "cpc2_output.txt")
 	allRows, _, err := parseCPC2Output(cpc2File)
-	
+
 	totalRows := 0
 	if err == nil {
 		totalRows = len(allRows)
@@ -538,13 +541,13 @@ func getModuleDetails(s *PipelineSummary, cfg *config.Config) []ModuleRenderData
 		if strings.HasSuffix(f.Name(), ".svg") {
 			// Extract Label (filename without extension, e.g. STRG.1.1)
 			label := strings.TrimSuffix(f.Name(), "_ss.svg")
-			
+
 			img := ReportImage{
 				Path:     "assets/rnafold/" + f.Name(),
 				Label:    label,
 				Sequence: seqs[label],
 			}
-			
+
 			// Attach CPC2 data if available
 			if row, ok := cpc2Map[label]; ok {
 				img.CPC2Data = &row
