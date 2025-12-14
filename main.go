@@ -15,6 +15,7 @@ import (
 	"github.com/BioinformaticsOnLine/regis/modules"
 	"github.com/BioinformaticsOnLine/regis/tui"
 	"github.com/BioinformaticsOnLine/regis/utils"
+	"github.com/BioinformaticsOnLine/regis/version"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/pflag"
 	"go.uber.org/zap"
@@ -62,7 +63,7 @@ func main() {
 	pflag.StringP("species", "s", "", "Species name for CPAT (Human, Mouse, Fly, Zebrafish)")
 	pflag.StringP("email", "e", "", "User email (optional)")
 	pflag.IntP("threads", "c", 0, "Number of CPU cores (default: all available)")
-	
+
 	// CPAT flags
 	pflag.Bool("skip_cpat", false, "Force CPC2-only mode (skip CPAT)")
 	pflag.String("cpat_hex", "", "Custom CPAT hexamer model file")
@@ -91,8 +92,9 @@ func main() {
 	// Report only
 	reportOnly := pflag.String("report", "", "Generate summary report from existing output directory")
 
-	// Help
+	// Help & Version
 	help := pflag.BoolP("help", "h", false, "Show help message")
+	versionFlag := pflag.BoolP("version", "v", false, "Show version information")
 
 	// Normalize flags: allow both underscores and hyphens (e.g. --lnctar-best works for --lnctar_best)
 	pflag.CommandLine.SetNormalizeFunc(func(f *pflag.FlagSet, name string) pflag.NormalizedName {
@@ -110,6 +112,11 @@ func main() {
 	// Handle immediate actions
 	if *help {
 		tui.ShowBanner()
+		os.Exit(0)
+	}
+
+	if *versionFlag {
+		fmt.Printf("regis version %s\n", version.Version)
 		os.Exit(0)
 	}
 
@@ -131,14 +138,14 @@ func main() {
 	}
 
 	// DEBUG: Check if flags are loaded
-	// fmt.Printf("DEBUG CONFIG: Method='%s' DataType='%s' File1='%s' File2='%s' OutputDir='%s'\n", 
+	// fmt.Printf("DEBUG CONFIG: Method='%s' DataType='%s' File1='%s' File2='%s' OutputDir='%s'\n",
 	//	cfg.Method, cfg.DataType, cfg.File1, cfg.File2, cfg.OutputDir)
 
 	// Interactive Mode Trigger
 	// If essential fields are missing, and no specific action requested, launch TUI wizard
 	if cfg.DataType == "" && cfg.Method == "" && cfg.File1 == "" && cfg.OutputDir == "" {
 		fmt.Println("Launching interactive mode...")
-		// Note: TUI CollectParameters returns a *Config. 
+		// Note: TUI CollectParameters returns a *Config.
 		// We might want to merge it? Or just use it.
 		// For now, TUI generates a fresh config.
 		interactiveCfg, err := tui.CollectParameters()
@@ -153,13 +160,21 @@ func main() {
 			// Missing required flags
 			tui.ShowBanner()
 			fmt.Println("\n❌ Missing required arguments via CLI/Config/Env.")
-			if cfg.DataType == "" { fmt.Println("   • Missing: -t / --data_type") }
-			if cfg.Method == "" { fmt.Println("   • Missing: -m / --method") }
-			if cfg.File1 == "" { fmt.Println("   • Missing: --f1") }
-			if cfg.OutputDir == "" { fmt.Println("   • Missing: -o / --output_dir") }
+			if cfg.DataType == "" {
+				fmt.Println("   • Missing: -t / --data_type")
+			}
+			if cfg.Method == "" {
+				fmt.Println("   • Missing: -m / --method")
+			}
+			if cfg.File1 == "" {
+				fmt.Println("   • Missing: --f1")
+			}
+			if cfg.OutputDir == "" {
+				fmt.Println("   • Missing: -o / --output_dir")
+			}
 			os.Exit(1)
 		}
-		
+
 		// Map 'Logic' fields to 'Enable' fields (compatibility with flags)
 		if cfg.LncTarBestOnly || cfg.LncTarComprehensive || cfg.LncTarHighly {
 			cfg.EnableLncTar = true

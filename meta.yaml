@@ -12,82 +12,117 @@ source:
     - logo/
     - jobs/
     - regis.db
-    - *.json
-    - .git/
+    - "out*/"
+    - "*.json"
+    - ".git/"
 
 build:
   number: 0
+  
+  # Add run_exports for better dependency resolution
+  run_exports:
+    - {{ pin_subpackage('regis', max_pin='x.x') }}
+  
   script: |
     # Enable CGO for SQLite support
     export CGO_ENABLED=1
     
-    # Build the Go binary
-    go build -o regis .
+    # Build with version info and optimizations
+    go build -ldflags="-s -w -X github.com/BioinformaticsOnLine/regis/version.Version={{ version }}" -o regis .
     
     # Install to conda prefix
     mkdir -p $PREFIX/bin
-    mkdir -p $PREFIX/share/regis/lnctar
+    mkdir -p $PREFIX/share/regis/assets
     
     # Copy binary
-    cp regis $PREFIX/bin/regis
-    chmod +x $PREFIX/bin/regis
+    install -m 755 regis $PREFIX/bin/regis
     
-    # Bundle LncTar for target prediction
-    cp -r lnctar/* $PREFIX/share/regis/lnctar/
-    chmod +x $PREFIX/share/regis/lnctar/LncTar.pl
+    # Bundle assets (models, lnctar, etc.)
+    cp -r assets/* $PREFIX/share/regis/assets/
+    chmod +x $PREFIX/share/regis/assets/lnctar/LncTar.pl
 
 requirements:
   build:
-    - {{ compiler('c') }} # Required for go-sqlite3
+    - {{ compiler('c') }}
+    - {{ compiler('cxx') }}  # Add C++ compiler (some bio tools need it)
     - go >=1.21
+    - make  # Good practice to include
+  
+  host:
+    # Add host section for build-time libs
+    - sqlite  # Explicitly declare SQLite dependency
   
   run:
-    - python >=3.10
+    - python >=3.10,<3.14  # Cap upper version for stability
+    - sqlite  # Runtime SQLite dependency
+    
+    # Core NGS tools
     - fastqc >=0.12.1
     - trimmomatic >=0.39
-    - sortmerna >=4.3.4  # NEW: rRNA filtering
+    - sortmerna >=4.3.4
+    
+    # Assembly tools
     - trinity >=2.15.2
     - hisat2 >=2.2.1
     - samtools >=1.22.1
-    - stringtie =2.1.7
+    - stringtie >=2.1.7,<2.2  # Relax version constraint
+    
+    # Sequence manipulation
     - gffread >=0.12.7
+    - seqkit
+    - bedtools
+    - bedops
+    
+    # UCSC tools
+    - ucsc-gtftogenepred
+    - ucsc-genepredtobed
+    
+    # lncRNA prediction
     - cpc2_standalone
+    - cpat
     - libsvm
-    - viennarna  # For RNAfold
-    - gffcompare  # Compare transcripts with reference annotations
-    - seqkit  # Filter and manipulate FASTA sequences
-    - bedtools  # Genomic interval operations
-    - bedops  # BED file operations
-    - ucsc-gtftogenepred  # GTF to GenePred conversion
-    - ucsc-genepredtobed  # GenePred to BED conversion
-    - subread  # featureCounts for expression quantification
-    - cpat  # Coding Potential Assessment Tool (multi-species validation)
-    - intarna  # RNA-RNA interaction prediction
-    - rseqc  # RNA-seq quality control plots
-    - multiqc  # Aggregate QC reports into interactive HTML dashboard
-    - igv-reports  # Create self-contained HTML reports with embedded IGV browser
+    
+    # RNA structure & interactions
+    - viennarna
+    - intarna
+    
+    # Quantification & comparison
+    - subread
+    - gffcompare
+    
+    # QC & reporting
+    - rseqc
+    - multiqc
+    - igv-reports
 
+# Modern conda practice: specify channel priority
 channels:
   - jitendralab
   - bioconda
   - conda-forge
+  - defaults
 
 test:
   commands:
-    - regis --help || true
-    - regis -h || true
+    - regis --version  # Better test - check version works
+    - regis --help
+    
+  # Add import tests if you expose any libraries
+  # imports:
+  #   - regis
 
 about:
   home: https://github.com/BioinformaticsOnLine/regis
-  license: GPL-3.0
-  summary: "REGIS v2.0 - RNA-seq Guided Identification System for lncRNA Discovery (Go implementation)"
+  license: GPL-3.0-or-later  # More specific SPDX identifier
+  license_file: LICENSE  # Include license file in package
+  summary: "REGIS v{{ version }} - RNA-seq Guided Identification System for lncRNA Discovery (Go implementation)"
   description: |
-    REGIS v2.0 is a comprehensive lncRNA identification pipeline implemented in Go
+    REGIS v{{ version }} is a comprehensive lncRNA identification pipeline implemented in Go
     with a modern Terminal User Interface (TUI). It performs:
     
     - Quality control with FastQC
     - Adapter trimming with Trimmomatic
-    - rRNA filtering with SortMeRNA (NEW in v2.0)
+    - rRNA filtering with SortMeRNA (NEW in v{{ version }})
     - De novo assembly with Trinity OR reference-based alignment with HISAT2
     - Transcript assembly with StringTie
     - Multi-tool coding potential assessment (CPC2 + CPAT for high-confidence predictions)
@@ -100,7 +135,7 @@ about:
     - Gene list building for enrichment analysis (getENRICH-ready)
     - Comprehensive visualization (IGV reports, RSeQC, MultiQC)
     
-    NEW in v2.0:
+    NEW in v1.0.1:
     - Go implementation with TUI (Terminal User Interface)
     - SortMeRNA integration for rRNA filtering
     - Automatic SILVA database download
@@ -109,6 +144,7 @@ about:
     - System resource monitoring (CPU/Memory)
     - Interactive help and command display
     
+
     The pipeline supports both single-end and paired-end data,
     and can work with or without a reference genome.
     
