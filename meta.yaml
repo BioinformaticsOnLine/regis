@@ -15,6 +15,9 @@ source:
     - "out*/"
     - "*.json"
     - ".git/"
+    - "conda-bld/"
+    - ".agent/"
+    - ".DS_Store"
 
 build:
   number: 0

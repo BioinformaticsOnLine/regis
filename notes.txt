@@ -30,3 +30,6 @@ curl -X POST http://localhost:3000/api/v1/jobs/submit \
   --f1 "/home/ajay/Desktop/Workspace_Pranjal/sample/in/SRR10341223_forward.fastqsanger" \
   --f2 "/home/ajay/Desktop/Workspace_Pranjal/sample/in/SRR10341223_reverse.fastqsanger" \
   --lnctar-best
+
+conda build . --output-folder ./conda-bld/ -c bioconda -c conda-forge -c jitendralab
+CONDA_SUBDIR=osx-64 conda build . --output-folder ./conda-bld/ -c bioconda -c conda-forge -c jitendralab
