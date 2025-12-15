@@ -42,3 +42,24 @@ git push origin main --tags
 git pull origin main
 
 anaconda upload -u jitendralab ./conda-bld/osx-64/regis-1.0.5-*.tar.bz2
+
+# Step 1: Build the conda package
+conda build . --output-folder ./conda-bld/ -c bioconda -c conda-forge -c jitendralab
+
+# Step 2: Upload to Anaconda Cloud (after build completes)
+anaconda upload -u jitendralab ./conda-bld/linux-64/regis-1.0.5-*.tar.bz2
+
+# Simple build (uses version from version/version.go)
+go build -o regis .
+
+# Build with optimizations (smaller binary, stripped debug info)
+go build -ldflags="-s -w" -o regis .
+
+# Build with explicit version (like conda does)
+go build -ldflags="-s -w -X github.com/BioinformaticsOnLine/regis/version.Version=1.0.5" -o regis .
+
+# Run directly without building
+go run .
+
+# Build and verify version
+go build -o regis . && ./regis --version
