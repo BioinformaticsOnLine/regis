@@ -48,6 +48,8 @@ conda build . --output-folder ./conda-bld/ -c bioconda -c conda-forge -c jitendr
 
 # Step 2: Upload to Anaconda Cloud (after build completes)
 anaconda upload -u jitendralab ./conda-bld/linux-64/regis-1.0.5-*.tar.bz2
+or
+anaconda upload -u jitendralab ./conda-bld/linux-64/regis-1.0.5-*.conda
 
 # Simple build (uses version from version/version.go)
 go build -o regis .
