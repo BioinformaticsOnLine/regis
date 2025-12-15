@@ -9,9 +9,9 @@ import (
 	"github.com/BioinformaticsOnLine/regis/api/db"
 	"github.com/BioinformaticsOnLine/regis/api/handlers"
 	"github.com/BioinformaticsOnLine/regis/config"
+	"github.com/BioinformaticsOnLine/regis/docs"
 	"github.com/BioinformaticsOnLine/regis/utils"
 	"github.com/BioinformaticsOnLine/regis/version"
-	_ "github.com/BioinformaticsOnLine/regis/docs" // Swagger docs
 	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
@@ -20,8 +20,13 @@ import (
 	fiberSwagger "github.com/swaggo/fiber-swagger"
 )
 
+// Set Swagger version dynamically from version.Version
+func init() {
+	docs.SwaggerInfo.Version = version.Version
+}
+
 // @title REGIS Pipeline API
-// @version 1.0.1
+// @version 1.0.5
 // @description REST API for controlling the REGIS lncRNA identification pipeline.
 // @termsOfService http://swagger.io/terms/
 
@@ -72,7 +77,7 @@ func NewServer(cfg *config.Config) *Server {
 func (s *Server) APIKeyMiddleware(c *fiber.Ctx) error {
 	// 1. Check Header
 	key := c.Get("X-API-Key")
-	
+
 	// 2. Check Query Param (fallback)
 	if key == "" {
 		key = c.Query("api_key")

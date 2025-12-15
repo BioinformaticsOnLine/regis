@@ -41,4 +41,4 @@ git push origin main --tags
 
 git pull origin main
 
-anaconda upload -u jitendralab ./conda-bld/osx-64/regis-1.0.4-*.tar.bz2
+anaconda upload -u jitendralab ./conda-bld/osx-64/regis-1.0.5-*.tar.bz2
