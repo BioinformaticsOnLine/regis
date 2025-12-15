@@ -1,21 +1,8 @@
 {
     "swagger": "2.0",
     "info": {
-        "description": "REST API for controlling the REGIS lncRNA identification pipeline.",
-        "title": "REGIS Pipeline API",
-        "termsOfService": "http://swagger.io/terms/",
-        "contact": {
-            "name": "API Support",
-            "email": "support@regis.bio"
-        },
-        "license": {
-            "name": "GPL-3.0",
-            "url": "https://github.com/BioinformaticsOnLine/regis/blob/main/LICENSE"
-        },
-        "version": "1.0.1"
+        "contact": {}
     },
-    "host": "localhost:3000",
-    "basePath": "/api/v1",
     "paths": {
         "/jobs/submit": {
             "post": {
