@@ -22,8 +22,9 @@ var k = koanf.New(".")
 // Config holds all pipeline configuration
 type Config struct {
 	// Run identification
-	RunID string `json:"run_id" mapstructure:"run_id"` // Unique identifier (UUID)
-	Email string `json:"email" mapstructure:"email" validate:"required,email"`   // User email
+	RunID   string `json:"run_id" mapstructure:"run_id"`     // Unique identifier (UUID)
+	JobName string `json:"job_name" mapstructure:"job_name"` // User-friendly job name (Optional)
+	Email   string `json:"email" mapstructure:"email" validate:"required,email"` // User email
 
 	// Required parameters
 	DataType  string `json:"data_type" mapstructure:"data_type" validate:"required,oneof=single paired"`   // "single" or "paired"

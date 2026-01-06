@@ -1,5 +1,6 @@
 {
     "email": "test@jitendralab.com",
+    "job_name": "Local Reference Test",
     "method": "reference",
     "data_type": "paired",
     "threads": 8,

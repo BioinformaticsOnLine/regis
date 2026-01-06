@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"time"
 
 	"github.com/BioinformaticsOnLine/regis/api/db"
@@ -14,15 +15,20 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
+	"github.com/shirou/gopsutil/v3/cpu"
+	"github.com/shirou/gopsutil/v3/mem"
 	"maragu.dev/goqite"
 )
 
 // BaseJobDir is the directory where jobs will be stored if no output dir is provided
 var BaseJobDir = "./jobs"
+var ServerStartTime time.Time
 
 // Job represents a pipeline job
 type Job struct {
 	ID         string         `json:"id" gorm:"primaryKey"`
+	JobName    string         `json:"job_name"`                      // User provided name
+	UserEmail  string         `json:"user_email" gorm:"index"`       // Indexed email for filtering
 	Status     string         `json:"status"`                        // queued, running, completed, failed
 	Config     *config.Config `json:"config" gorm:"serializer:json"` // Store as JSON in DB
 	StartTime  time.Time      `json:"start_time"`
@@ -227,9 +233,11 @@ func SubmitJob(c *fiber.Ctx) error {
 	}
 
 	job := &Job{
-		ID:     jobID,
-		Status: "queued",
-		Config: cfg,
+		ID:        jobID,
+		JobName:   cfg.JobName,
+		UserEmail: cfg.Email,
+		Status:    "queued",
+		Config:    cfg,
 	}
 
 	// Save initial state to DB
@@ -255,6 +263,33 @@ func SubmitJob(c *fiber.Ctx) error {
 		"message":    "Job submitted successfully",
 		"output_dir": cfg.OutputDir,
 	})
+}
+
+// ListJobs returns a list of jobs, optionally filtered by email
+// @Summary List jobs
+// @Description Get a list of jobs, optionally filtered by user email
+// @Tags jobs
+// @Produce json
+// @Param email query string false "Filter by User Email"
+// @Success 200 {array} Job
+// @Router /jobs [get]
+func ListJobs(c *fiber.Ctx) error {
+	email := c.Query("email")
+
+	var jobs []Job
+	query := db.GetDB().Model(&Job{}).Order("start_time desc")
+
+	if email != "" {
+		query = query.Where("user_email = ?", email)
+	}
+
+	if result := query.Find(&jobs); result.Error != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to fetch jobs",
+		})
+	}
+
+	return c.JSON(jobs)
 }
 
 // GetJobStatus returns the status of a specific job
@@ -313,4 +348,66 @@ func GetJobResults(c *fiber.Ctx) error {
 	})
 }
 
+// GetStats returns API statistics
+// @Summary Get API statistics
+// @Description Get system-wide statistics including total jobs, queued jobs, and last submission time
+// @Tags stats
+// @Produce json
+// @Success 200 {object} map[string]interface{}
+// @Router /stats [get]
+func GetStats(c *fiber.Ctx) error {
+	var totalJobs int64
+	var queuedJobs int64
+	var runningJobs int64
+	var completedJobs int64
+	var failedJobs int64
+	var lastJob Job
 
+	// 1. Job Statistics
+	db.GetDB().Model(&Job{}).Count(&totalJobs)
+	db.GetDB().Model(&Job{}).Where("status = ?", "queued").Count(&queuedJobs)
+	db.GetDB().Model(&Job{}).Where("status = ?", "running").Count(&runningJobs)
+	db.GetDB().Model(&Job{}).Where("status = ?", "completed").Count(&completedJobs)
+	db.GetDB().Model(&Job{}).Where("status = ?", "failed").Count(&failedJobs)
+
+	// Get last submitted job
+	result := db.GetDB().Order("start_time desc").First(&lastJob)
+
+	// 2. System Statistics (Real Data)
+	v, _ := mem.VirtualMemory()
+	cStats, _ := cpu.Percent(0, false)
+	cpuPercent := 0.0
+	if len(cStats) > 0 {
+		cpuPercent = cStats[0]
+	}
+
+	response := fiber.Map{
+		"server": fiber.Map{
+			"uptime_seconds": time.Since(ServerStartTime).Seconds(),
+			"uptime_human":   time.Since(ServerStartTime).String(),
+			"start_time":     ServerStartTime.Format(time.RFC3339),
+			"version":        "1.0.5",
+		},
+		"jobs": fiber.Map{
+			"total":     totalJobs,
+			"queued":    queuedJobs,
+			"running":   runningJobs,
+			"completed": completedJobs,
+			"failed":    failedJobs,
+		},
+		"system": fiber.Map{
+			"cpus":        runtime.NumCPU(),
+			"cpu_percent": cpuPercent,
+			"memory_used_mb":  v.Used / 1024 / 1024,
+			"memory_total_mb": v.Total / 1024 / 1024,
+			"memory_percent":  v.UsedPercent,
+		},
+		"last_job_submitted": nil,
+	}
+
+	if result.Error == nil && !lastJob.StartTime.IsZero() {
+		response["last_job_submitted"] = lastJob.StartTime.Format(time.RFC3339)
+	}
+
+	return c.JSON(response)
+}

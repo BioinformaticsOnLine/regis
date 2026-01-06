@@ -1,5 +1,6 @@
 {
     "email": "pranjal.p@example.com",
+    "job_name": "HPC Benchmark Run",
     "data_type": "paired",
     "method": "reference",
     "reference": "/home/ajay/Desktop/Workspace_Pranjal/sample/in/GCA_907165135.1_OKI2018_I68_1.0_genomic.fna",

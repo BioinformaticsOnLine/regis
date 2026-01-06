@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/BioinformaticsOnLine/regis/api/db"
 	"github.com/BioinformaticsOnLine/regis/api/handlers"
@@ -102,6 +103,9 @@ func (s *Server) Listen(addr string) error {
 func StartServer(port, jobDir string) {
 	// Initialize Database
 	db.Init("regis.db")
+	
+	// Record Start Time
+	handlers.ServerStartTime = time.Now()
 
 	// Auto Migrate
 	if err := db.GetDB().AutoMigrate(&handlers.Job{}); err != nil {

@@ -15,7 +15,7 @@ regis_output_*
 jobs/
 my_jobs/
 conda-bld/
-notes/
+out*/
 # OS specific
 .DS_Store
 Thumbs.db

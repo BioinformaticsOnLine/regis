@@ -585,26 +585,7 @@ func getModuleDetails(s *PipelineSummary, cfg *config.Config) []ModuleRenderData
 		TotalImages: totalImages,
 	})
 
-	modules = append(modules, ModuleRenderData{
-		ID:       8,
-		Name:     "Secondary Structure Prediction",
-		Icon:     "🌀",
-		Duration: getDuration("RNAfold"),
-		Status:   "Success",
-		Description: []string{
-			"Predicted minimum free energy (MFE) structures",
-			"Generated visualization images",
-		},
-		Inputs: []string{
-			"06_cpc2/transcripts.fa",
-		},
-		Outputs: []string{
-			"09_rnafold/lncrna_structures.out",
-			"09_rnafold/svg_files/*.svg",
-		},
-		Metrics: s.RNAfold,
-		Images:  rnaImages,
-	})
+
 
 	// 9. LncTar
 	modules = append(modules, ModuleRenderData{

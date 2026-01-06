@@ -19,9 +19,12 @@ func (s *Server) SetupRoutes() {
 		})
 	})
 
-	// Job Management Routes (Protected)
+	// Statistics (Public - No Auth)
+	v1.Get("/stats", handlers.GetStats)
+
 	jobs := v1.Group("/jobs", s.APIKeyMiddleware)
 	jobs.Post("/submit", handlers.SubmitJob)
+	jobs.Get("/", handlers.ListJobs) // Listing jobs
 	jobs.Get("/:uuid/status", handlers.GetJobStatus)
 	jobs.Get("/:uuid/results", handlers.GetJobResults)
 	jobs.Get("/:uuid/results/metrics", handlers.GetJobMetrics)
