@@ -65,3 +65,21 @@ go run .
 
 # Build and verify version
 go build -o regis . && ./regis --version
+
+# ─── v1.0.6: Fix libgcc>=15 / glibc solver conflict ─────────────────────────
+# IMPORTANT: Build must be done on Linux (or use conda-build on Linux CI)
+# The sysroot_linux-64 >=2.17 pin in meta.yaml forces glibc 2.17 ABI compat.
+
+# Step 1: Build linux-64 package (run this ON a Linux machine)
+conda build . --output-folder ./conda-bld/ -c bioconda -c conda-forge -c jitendralab
+
+# Step 2: Upload linux-64 build
+anaconda upload -u jitendralab ./conda-bld/linux-64/regis-1.0.6-*.tar.bz2
+# or if .conda format:
+anaconda upload -u jitendralab ./conda-bld/linux-64/regis-1.0.6-*.conda
+
+# Step 3: Tag the release
+git add meta.yaml
+git commit -m "Release v1.0.6: Fix libgcc>=15 glibc solver conflict on linux-64"
+git tag v1.0.6
+git push origin main --tags

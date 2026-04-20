@@ -1,5 +1,5 @@
 {% set name = "regis" %}
-{% set version = "1.0.5" %}
+{% set version = "1.0.6" %}
 
 package:
   name: {{ name|lower }}
@@ -21,6 +21,11 @@ source:
 
 build:
   number: 0
+  # Force glibc 2.17 ABI compatibility so package installs on all modern Linux
+  # without libgcc>=15 solver conflicts (the pre-2.39 glibc issue)
+  missing_dso_whitelist:
+    - $RPATH/libm.so.6
+    - $RPATH/libc.so.6
   
   # Add run_exports for better dependency resolution
   run_exports:
@@ -50,6 +55,10 @@ requirements:
     - {{ compiler('cxx') }}  # Add C++ compiler (some bio tools need it)
     - go >=1.21
     - make  # Good practice to include
+    # Force old sysroot on Linux: pins GCC to use glibc 2.17 ABI.
+    # This prevents conda solver from resolving to libgcc>=15 which
+    # causes UnsatisfiableError on lab workstations with glibc 2.39
+    - sysroot_linux-64 >=2.17  # [linux64]
   
   host:
     # Add host section for build-time libs
@@ -118,7 +127,7 @@ about:
   home: https://github.com/BioinformaticsOnLine/regis
   license: GPL-3.0-or-later  # More specific SPDX identifier
   license_file: LICENSE  # Include license file in package
-  summary: "REGIS v{{ version }} - RNA-seq Guided Identification System for lncRNA Discovery (Go implementation)"
+  summary: "REGIS v{{ version }} - RNA-seq Guided Identification System for lncRNA Discovery (Go implementation, linux-64 glibc compat fix)"
   description: |
     REGIS v{{ version }} is a comprehensive lncRNA identification pipeline implemented in Go
     with a modern Terminal User Interface (TUI). It performs:

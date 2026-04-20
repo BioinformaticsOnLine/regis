@@ -22,6 +22,9 @@ func (s *Server) SetupRoutes() {
 	// Statistics (Public - No Auth)
 	v1.Get("/stats", handlers.GetStats)
 
+	// File Upload (Protected)
+	v1.Post("/upload", s.APIKeyMiddleware, handlers.UploadFile)
+
 	jobs := v1.Group("/jobs", s.APIKeyMiddleware)
 	jobs.Post("/submit", handlers.SubmitJob)
 	jobs.Get("/", handlers.ListJobs) // Listing jobs
