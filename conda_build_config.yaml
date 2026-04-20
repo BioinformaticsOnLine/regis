@@ -1,0 +1,9 @@
+# conda_build_config.yaml
+# Limit variants to avoid building for multiple python/numpy versions.
+# The regis binary itself does not ship Python code but some run-deps require Python.
+
+python:
+  - "3.10"
+
+numpy:
+  - "1.22"

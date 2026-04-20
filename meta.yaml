@@ -21,19 +21,22 @@ source:
 
 build:
   number: 0
-  # Force glibc 2.17 ABI compatibility so package installs on all modern Linux
-  # without libgcc>=15 solver conflicts (the pre-2.39 glibc issue)
+  # Allow standard system libs (libc, libm, libpthread) to be untracked
+  # The Go binary only links these at system level, not through conda.
   missing_dso_whitelist:
     - $RPATH/libm.so.6
     - $RPATH/libc.so.6
-  
-  # Add run_exports for better dependency resolution
-  run_exports:
-    - {{ pin_subpackage('regis', max_pin='x.x') }}
+    - $RPATH/libpthread.so.0
+    - $RPATH/libdl.so.2
   
   script: |
-    # Enable CGO for SQLite support
+    # Use system GCC (not conda-forge GCC 15) to avoid libgcc>=15 run_exports.
+    # System GCC on modern Ubuntu/CentOS links against glibc 2.17 ABI.
     export CGO_ENABLED=1
+    export CC=gcc
+    export CXX=g++
+    # Strip debug info and set version; link only minimal system libs
+    export CGO_LDFLAGS="-Wl,--as-needed"
     
     # Build with version info and optimizations
     go build -ldflags="-s -w -X github.com/BioinformaticsOnLine/regis/version.Version={{ version }}" -o regis .
@@ -51,14 +54,12 @@ build:
 
 requirements:
   build:
-    - {{ compiler('c') }}
-    - {{ compiler('cxx') }}  # Add C++ compiler (some bio tools need it)
+    # Use named compilers WITHOUT the compiler() macro to avoid auto-injecting
+    # libgcc>=15 run_exports. The Go binary has minimal C linkage (CGO for SQLite).
+    - gcc           # [linux]
+    - gxx           # [linux]
     - go >=1.21
-    - make  # Good practice to include
-    # Force old sysroot on Linux: pins GCC to use glibc 2.17 ABI.
-    # This prevents conda solver from resolving to libgcc>=15 which
-    # causes UnsatisfiableError on lab workstations with glibc 2.39
-    - sysroot_linux-64 >=2.17  # [linux64]
+    - make
   
   host:
     # Add host section for build-time libs
@@ -106,6 +107,12 @@ requirements:
     - rseqc
     - multiqc
     - igv-reports
+    
+    # Explicit glibc virtual package constraint.
+    # Go+CGO binary only needs system libc/libm/pthread — all modern Linux
+    # (glibc 2.17 through 2.39+) satisfy this. This REPLACES the broken
+    # libgcc>=15 constraint that the compiler() macro was injecting.
+    - __glibc >=2.17  # [linux]
 
 # Modern conda practice: specify channel priority
 channels:

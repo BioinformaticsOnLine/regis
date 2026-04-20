@@ -68,7 +68,8 @@ go build -o regis . && ./regis --version
 
 # ─── v1.0.6: Fix libgcc>=15 / glibc solver conflict ─────────────────────────
 # IMPORTANT: Build must be done on Linux (or use conda-build on Linux CI)
-# The sysroot_linux-64 >=2.17 pin in meta.yaml forces glibc 2.17 ABI compat.
+# The explicit `__glibc >=2.17` virtual package constraint in meta.yaml 
+# prevents libgcc>=15 injection and ensures compatibility with older and newer glibc.
 
 # Step 1: Build linux-64 package (run this ON a Linux machine)
 conda build . --output-folder ./conda-bld/ -c bioconda -c conda-forge -c jitendralab
