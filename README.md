@@ -90,26 +90,50 @@ graph TD
 
 ## 📦 Installation
 
-### Prerequisites
-REGIS relies on several external bioinformatics tools. We recommend using **Conda** to manage these dependencies.
+The easiest way to install REGIS and all its dependencies is via Conda/Mamba.
+
+### Option 1: Quick Install via Conda (Recommended)
+
+REGIS is available on Anaconda Cloud:
+🔗 [Anaconda Package Overview](https://anaconda.org/channels/jitendralab/packages/regis/overview)
+
+```bash
+conda create -n regis_env -c bioconda -c conda-forge -c jitendralab python=3.10
+conda activate regis_env
+conda install jitendralab::regis
+```
+
+#### Need Conda/Mamba?
+If you don't have Conda installed on your system, we highly recommend installing **Miniforge** (which includes `mamba` for faster resolving):
+
+```bash
+# Download the installer (Linux x86_64)
+wget https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh
+
+# Run the installer
+bash Miniforge3-Linux-x86_64.sh
+
+# Restart your terminal or source your .bashrc
+source ~/.bashrc
+```
+
+### Option 2: Build from Source (For Developers)
+
+If you prefer to build from source, you will need to manually install dependencies.
 
 1.  **Install Go (v1.21+)**: [Download Go](https://go.dev/dl/)
 2.  **External Tools**:
     ```bash
-    # Create a conda environment with all dependencies
     conda create -n regis -c bioconda -c conda-forge \
         fastqc trimmomatic sortmerna hisat2 trinity stringtie \
         samtools gffcompare seqkit bedtools subread \
-        python=3.10 rna-seqc multiqc igv-reports
-    
-    # Activate environment
+        python=3.10 rna-seqc multiqc igv-reports sqlite
     conda activate regis
-    ```
     ```
     *Note: CPC2, CPAT, LncTar, and IntaRNA may require manual installation or specific bioconda recipes.*
 
 > [!WARNING]
-> **Apple Silicon (M1/M2/M3) Users**: The `sortmerna` binary from Bioconda uses AVX2 instructions incompatible with Rosetta 2, causing a crash. Please **omit** the `--sortmerna` flag when running REGIS on macOS ARM systems, or run the pipeline inside a Docker container (x86_64).
+> **Apple Silicon (M1/M2/M3) Users**: The `sortmerna` binary from Bioconda uses AVX2 instructions incompatible with Rosetta 2, causing a crash. Please **omit** the `--sortmerna` flag when running REGIS natively on macOS ARM systems, or run the pipeline inside a Linux Docker container.
 
 ### Build from Source
 ```bash
