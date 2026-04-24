@@ -66,14 +66,14 @@ func ValidateConfig(cfg *config.Config) error {
 		return fmt.Errorf("output directory is required")
 	}
 
-	// Validate threads
-	if cfg.Threads < 0 {
-		return fmt.Errorf("threads must be >= 0")
-	}
-
-	// If threads is 0, set to number of CPUs
-	if cfg.Threads == 0 {
-		cfg.Threads = runtime.NumCPU()
+	// Validate and resolve threads
+	// cfg.Threads == 0 means "use all available CPUs" (default / not set by user)
+	availableCPUs := runtime.NumCPU()
+	if cfg.Threads <= 0 {
+		cfg.Threads = availableCPUs
+	} else if cfg.Threads > availableCPUs {
+		// Requested more threads than available — clamp to avoid Trimmomatic / HISAT2 errors
+		cfg.Threads = availableCPUs
 	}
 
 	// Set asset paths if not provided

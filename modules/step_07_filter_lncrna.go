@@ -3,6 +3,7 @@ package modules
 import (
 	"context"
 	"fmt"
+	"math"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -36,8 +37,8 @@ func Step07FilterLncRNA(ctx context.Context, cfg *config.Config) error {
 	alignmentDir := filepath.Join(cfg.OutputDir, "04_alignment")
 
 	// Step 1: Filter lncRNAs by consensus and length/probability
-	utils.ShowProgress("Filtering lncRNAs by validation and quality criteria")
-	if err := filterLncRNAs(validationDir, cpc2Dir, intermediateDir, filteredDir); err != nil {
+	utils.ShowProgress(fmt.Sprintf("Filtering lncRNAs by validation and quality criteria (length >= %d)", cfg.MinLncRNALength))
+	if err := filterLncRNAs(cfg, validationDir, cpc2Dir, intermediateDir, filteredDir); err != nil {
 		return fmt.Errorf("failed to filter lncRNAs: %w", err)
 	}
 
@@ -96,22 +97,55 @@ func Step07FilterLncRNA(ctx context.Context, cfg *config.Config) error {
 	return nil
 }
 
+// scoredTranscript holds intermediate scoring data for a CPC2 line
+type scoredTranscript struct {
+	id         string
+	length     int
+	prob       float64
+	baseScore  float64
+	penalty    float64
+	finalScore float64
+	line       string
+}
+
+// computeScore calculates the confidence score for a transcript.
+// base_score = 1.0 - cpc2_coding_probability
+// length_penalty = penaltyFactor * max(0, minLength-length) / minLength
+// final_score = base_score - length_penalty
+func computeScore(prob float64, length, minLength int, penaltyFactor float64) (base, penalty, final float64) {
+	base = 1.0 - prob
+	if length < minLength && minLength > 0 {
+		shortfall := float64(minLength-length) / float64(minLength)
+		penalty = penaltyFactor * shortfall
+	}
+	final = math.Max(0, base-penalty)
+	return
+}
+
 // filterLncRNAs filters lncRNAs based on consensus and quality criteria
-func filterLncRNAs(validationDir, cpc2Dir, intermediateDir, filteredDir string) error {
+func filterLncRNAs(cfg *config.Config, validationDir, cpc2Dir, intermediateDir, filteredDir string) error {
 	consensusFile := filepath.Join(validationDir, "consensus_noncoding.txt")
 	cpc2Output := filepath.Join(cpc2Dir, "cpc2_output.txt")
 
+	utils.Info(fmt.Sprintf("Scoring params: min_length=%d, length_penalty=%.2f, score_threshold=%.2f",
+		cfg.MinLncRNALength, cfg.LengthPenalty, cfg.ScoreThreshold))
+
+	// scored TSV header
+	scoredHeader := "transcript_id\tlength\tcpc2_prob\tbase_score\tlength_penalty\tfinal_score\tstatus"
+
 	if utils.FileExists(consensusFile) {
 		// Use consensus predictions
-		utils.Info("Using multi-tool consensus predictions for filtering")
+		utils.Info("Using multi-tool consensus predictions for scoring")
 
-		// Read consensus IDs
 		consensusIDs, err := utils.ReadLines(consensusFile)
 		if err != nil {
 			return err
 		}
+		consensusSet := make(map[string]bool)
+		for _, id := range consensusIDs {
+			consensusSet[id] = true
+		}
 
-		// Filter CPC2 output by length (>200) and probability (<0.5)
 		cpc2Lines, err := utils.ReadLines(cpc2Output)
 		if err != nil {
 			return err
@@ -119,44 +153,54 @@ func filterLncRNAs(validationDir, cpc2Dir, intermediateDir, filteredDir string) 
 
 		var filtered []string
 		var filteredIDs []string
-		filtered = append(filtered, cpc2Lines[0]) // Add header
+		var scoredRows []string
+		filtered = append(filtered, cpc2Lines[0]) // header
+		scoredRows = append(scoredRows, scoredHeader)
 
 		for i, line := range cpc2Lines {
 			if i == 0 {
 				continue
 			}
 			fields := strings.Fields(line)
-			if len(fields) >= 8 {
-				id := fields[0]
-				length, _ := strconv.Atoi(fields[1])
-				prob, _ := strconv.ParseFloat(fields[6], 64)
-
-				if fields[7] == "noncoding" && length > 200 && prob < 0.5 {
-					// Check if in consensus
-					for _, cid := range consensusIDs {
-						if id == cid {
-							filtered = append(filtered, line)
-							filteredIDs = append(filteredIDs, id)
-							break
-						}
-					}
-				}
+			if len(fields) < 8 || fields[7] != "noncoding" {
+				continue
 			}
+
+			id := fields[0]
+			if !consensusSet[id] {
+				continue
+			}
+
+			length, _ := strconv.Atoi(fields[1])
+			prob, _ := strconv.ParseFloat(fields[6], 64)
+
+			base, pen, final := computeScore(prob, length, cfg.MinLncRNALength, cfg.LengthPenalty)
+			status := "rejected"
+			if final >= cfg.ScoreThreshold {
+				status = "kept"
+				filtered = append(filtered, line)
+				filteredIDs = append(filteredIDs, id)
+			}
+			scoredRows = append(scoredRows, fmt.Sprintf("%s\t%d\t%.4f\t%.4f\t%.4f\t%.4f\t%s",
+				id, length, prob, base, pen, final, status))
 		}
 
-		// Write filtered results
 		if err := utils.WriteLines(filepath.Join(filteredDir, "lncrna_filtered.txt"), filtered); err != nil {
 			return err
 		}
 		if err := utils.WriteLines(filepath.Join(intermediateDir, "lncrna_filtered_ids.txt"), filteredIDs); err != nil {
 			return err
 		}
+		if err := utils.WriteLines(filepath.Join(intermediateDir, "lncrna_scores.tsv"), scoredRows); err != nil {
+			utils.Warn("Failed to write scoring table", zap.Error(err))
+		}
 
-		utils.Info(fmt.Sprintf("Filtered to %d high-confidence lncRNAs (>200nt, prob<0.5, validated)", len(filteredIDs)))
+		utils.Info(fmt.Sprintf("Retained %d high-confidence lncRNAs (score>=%.2f, consensus+CPC2)",
+			len(filteredIDs), cfg.ScoreThreshold))
 
 	} else {
 		// CPC2-only filtering
-		utils.Info("Using CPC2-only predictions for filtering")
+		utils.Info("Using CPC2-only predictions for scoring")
 
 		cpc2Lines, err := utils.ReadLines(cpc2Output)
 		if err != nil {
@@ -165,22 +209,32 @@ func filterLncRNAs(validationDir, cpc2Dir, intermediateDir, filteredDir string) 
 
 		var filtered []string
 		var filteredIDs []string
-		filtered = append(filtered, cpc2Lines[0]) // Add header
+		var scoredRows []string
+		filtered = append(filtered, cpc2Lines[0])
+		scoredRows = append(scoredRows, scoredHeader)
 
 		for i, line := range cpc2Lines {
 			if i == 0 {
 				continue
 			}
 			fields := strings.Fields(line)
-			if len(fields) >= 8 {
-				length, _ := strconv.Atoi(fields[1])
-				prob, _ := strconv.ParseFloat(fields[6], 64)
-
-				if fields[7] == "noncoding" && length > 200 && prob < 0.5 {
-					filtered = append(filtered, line)
-					filteredIDs = append(filteredIDs, fields[0])
-				}
+			if len(fields) < 8 || fields[7] != "noncoding" {
+				continue
 			}
+
+			id := fields[0]
+			length, _ := strconv.Atoi(fields[1])
+			prob, _ := strconv.ParseFloat(fields[6], 64)
+
+			base, pen, final := computeScore(prob, length, cfg.MinLncRNALength, cfg.LengthPenalty)
+			status := "rejected"
+			if final >= cfg.ScoreThreshold {
+				status = "kept"
+				filtered = append(filtered, line)
+				filteredIDs = append(filteredIDs, id)
+			}
+			scoredRows = append(scoredRows, fmt.Sprintf("%s\t%d\t%.4f\t%.4f\t%.4f\t%.4f\t%s",
+				id, length, prob, base, pen, final, status))
 		}
 
 		if err := utils.WriteLines(filepath.Join(filteredDir, "lncrna_filtered.txt"), filtered); err != nil {
@@ -189,8 +243,12 @@ func filterLncRNAs(validationDir, cpc2Dir, intermediateDir, filteredDir string) 
 		if err := utils.WriteLines(filepath.Join(intermediateDir, "lncrna_filtered_ids.txt"), filteredIDs); err != nil {
 			return err
 		}
+		if err := utils.WriteLines(filepath.Join(intermediateDir, "lncrna_scores.tsv"), scoredRows); err != nil {
+			utils.Warn("Failed to write scoring table", zap.Error(err))
+		}
 
-		utils.Info(fmt.Sprintf("Filtered to %d high-confidence lncRNAs (>200nt, prob<0.5)", len(filteredIDs)))
+		utils.Info(fmt.Sprintf("Retained %d high-confidence lncRNAs (score>=%.2f, CPC2-only)",
+			len(filteredIDs), cfg.ScoreThreshold))
 	}
 
 	return nil

@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -38,8 +39,11 @@ type Config struct {
 	GTF       string `json:"gtf" mapstructure:"gtf"`             // Reference annotation GTF
 
 	// Optional parameters
-	Threads int    `json:"threads" mapstructure:"threads"` // Number of threads
-	Species string `json:"species" mapstructure:"species"` // Species name for CPAT
+	Threads         int     `json:"threads" mapstructure:"threads"` // Number of threads
+	Species         string  `json:"species" mapstructure:"species"` // Species name for CPAT
+	MinLncRNALength int     `json:"min_length" mapstructure:"min_length"`         // Minimum length for lncRNA filtering
+	LengthPenalty   float64 `json:"length_penalty" mapstructure:"length_penalty"` // Penalty factor for sub-threshold length (0=no penalty, 1=max)
+	ScoreThreshold  float64 `json:"score_threshold" mapstructure:"score_threshold"` // Minimum confidence score to keep a transcript
 
 	// Validation options
 	SkipCPAT  bool   `json:"skip_cpat" mapstructure:"skip_cpat"`   // CPC2-only mode
@@ -99,9 +103,12 @@ type SlurmConfig struct {
 // NewConfig creates a new Config with default values
 func NewConfig() *Config {
 	return &Config{
-		RunID:         uuid.New().String(),
-		Threads:       0,
-		ExecutionMode: "local",
+		RunID:           uuid.New().String(),
+		Threads:         0,
+		MinLncRNALength: 200,
+		LengthPenalty:   0.5,
+		ScoreThreshold:  0.5,
+		ExecutionMode:   "local",
 		AssetsDir:     "./assets",
 		Slurm: &SlurmConfig{
 			Partition: "compute",
@@ -160,20 +167,38 @@ func Load(f *pflag.FlagSet, configFile string) (*Config, error) {
 			"skip_cpat":            "SkipCPAT",
 			"sortmerna":            "EnableSortMeRNA",
 			"threads":              "Threads",
+			"min_length":           "MinLncRNALength",
+			"length_penalty":       "LengthPenalty",
+			"score_threshold":      "ScoreThreshold",
 			"email":                "Email",
 		}
 
 		// Only load flags that were explicitly set by the user
+		// IMPORTANT: Store values as their native types (int/float/bool/string) so
+		// koanf confmap can unmarshal them correctly. Storing everything as string
+		// causes silent zero-values for numeric fields (e.g. --threads/-c).
 		f.Visit(func(flag *pflag.Flag) {
 			key := flag.Name
 			if mapped, ok := mapping[key]; ok {
 				key = mapped
 			}
-			// DEBUG: Check what's being loaded
-			// fmt.Printf("DEBUG FLAG VISIT: Name='%s' MappedKey='%s' Value='%s'\n", flag.Name, key, flag.Value.String())
-
-			// Use the string value; koanf will handle type conversion if schema matches
-			flagMap[key] = flag.Value.String()
+			raw := flag.Value.String()
+			switch flag.Value.Type() {
+			case "int", "int64":
+				if v, err := strconv.ParseInt(raw, 10, 64); err == nil {
+					flagMap[key] = int(v)
+				}
+			case "float64":
+				if v, err := strconv.ParseFloat(raw, 64); err == nil {
+					flagMap[key] = v
+				}
+			case "bool":
+				if v, err := strconv.ParseBool(raw); err == nil {
+					flagMap[key] = v
+				}
+			default:
+				flagMap[key] = raw
+			}
 		})
 
 		if err := k.Load(confmap.Provider(flagMap, "."), nil); err != nil {

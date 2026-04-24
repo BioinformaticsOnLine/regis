@@ -63,6 +63,9 @@ func main() {
 	pflag.StringP("species", "s", "", "Species name for CPAT (Human, Mouse, Fly, Zebrafish)")
 	pflag.StringP("email", "e", "", "User email (optional)")
 	pflag.IntP("threads", "c", 0, "Number of CPU cores (default: all available)")
+	pflag.IntP("min_length", "l", 200, "Minimum sequence length for lncRNA filtering")
+	pflag.Float64("length_penalty", 0.5, "Penalty factor (0-1) applied to transcripts shorter than --min_length")
+	pflag.Float64("score_threshold", 0.5, "Minimum confidence score to retain a transcript (after length penalty)")
 
 	// CPAT flags
 	pflag.Bool("skip_cpat", false, "Force CPC2-only mode (skip CPAT)")

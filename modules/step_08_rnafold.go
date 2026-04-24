@@ -29,12 +29,12 @@ func Step08RNAfold(ctx context.Context, cfg *config.Config) error {
 		return fmt.Errorf("failed to create RNAfold directories: %w", err)
 	}
 
-	// Input file
-	cpc2Dir := filepath.Join(cfg.OutputDir, "06_cpc2")
-	transcriptsFa := filepath.Join(cpc2Dir, "transcripts.fa")
+	// Input file - Use filtered significant lncRNAs instead of all transcripts
+	lncrnaDir := filepath.Join(cfg.OutputDir, "08_lncrna_analysis")
+	lncrnaFa := filepath.Join(lncrnaDir, "filtered", "lncrna_filtered.fa")
 
-	if !utils.FileExists(transcriptsFa) {
-		return fmt.Errorf("transcripts.fa not found: %s", transcriptsFa)
+	if !utils.FileExists(lncrnaFa) {
+		return fmt.Errorf("lncrna_filtered.fa not found: %s", lncrnaFa)
 	}
 
 	// Run RNAfold in its output directory
@@ -54,7 +54,7 @@ func Step08RNAfold(ctx context.Context, cfg *config.Config) error {
 	// Run RNAfold with input redirection
 	// Use --noPS to avoid generating PostScript files (we will generate SVGs with RNAplot)
 	outputFile := filepath.Join(rnafoldDir, "lncrna_structures.out")
-	if err := runRNAfold(ctx, transcriptsFa, outputFile); err != nil {
+	if err := runRNAfold(ctx, lncrnaFa, outputFile); err != nil {
 		return fmt.Errorf("RNAfold failed: %w", err)
 	}
 
