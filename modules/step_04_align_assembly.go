@@ -31,6 +31,9 @@ func runDeNovoAssembly(ctx context.Context, cfg *config.Config, stepStart time.T
 
 	// Create output directories
 	assemblyDir := filepath.Join(cfg.OutputDir, "05_assembly")
+	// Trinity REQUIRES the word "trinity" in its --output path as a safety check.
+	// We use a subdirectory named "trinity_out" inside 05_assembly.
+	trinityOutDir := filepath.Join(assemblyDir, "trinity_out")
 	cpc2Dir := filepath.Join(cfg.OutputDir, "06_cpc2")
 	if err := utils.CreateDirs(assemblyDir, cpc2Dir); err != nil {
 		return fmt.Errorf("failed to create assembly directories: %w", err)
@@ -51,7 +54,7 @@ func runDeNovoAssembly(ctx context.Context, cfg *config.Config, stepStart time.T
 	args = append(args,
 		"--max_memory", "50G",
 		"--CPU", strconv.Itoa(cfg.Threads),
-		"--output", assemblyDir,
+		"--output", trinityOutDir,
 	)
 
 	// Run Trinity
@@ -59,8 +62,8 @@ func runDeNovoAssembly(ctx context.Context, cfg *config.Config, stepStart time.T
 		return fmt.Errorf("Trinity failed: %w", err)
 	}
 
-	// Verify Trinity output
-	trinityFasta := filepath.Join(assemblyDir, "Trinity.fasta")
+	// Verify Trinity output — Trinity writes Trinity.fasta into trinityOutDir
+	trinityFasta := filepath.Join(trinityOutDir, "Trinity.fasta")
 	if !utils.FileExists(trinityFasta) {
 		return fmt.Errorf("Trinity output missing: %s", trinityFasta)
 	}
