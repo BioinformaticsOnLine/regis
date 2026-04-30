@@ -62,6 +62,8 @@ func (p *PipelineRunner) RunHeadless(ctx context.Context) error {
 	stepName := "De Novo Assembly with Trinity"
 	if cfg.Method == "reference" {
 		stepName = "Reference-based Alignment with HISAT2"
+	} else if cfg.Assembler == "rnabloom" {
+		stepName = "De Novo Assembly with RNA-Bloom"
 	}
 	if err := runStep(ctx, 4, stepName, func() error {
 		return Step04AlignAssembly(ctx, cfg)

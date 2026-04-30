@@ -41,6 +41,8 @@ type Config struct {
 	// Optional parameters
 	Threads         int     `json:"threads" mapstructure:"threads"` // Number of threads
 	Species         string  `json:"species" mapstructure:"species"` // Species name for CPAT
+	Assembler       string  `json:"assembler" mapstructure:"assembler"` // De novo assembler: "trinity" or "rnabloom"
+	Stranded        string  `json:"stranded" mapstructure:"stranded"` // Library strandedness: unstranded, rf, fr, f, r
 	MinLncRNALength int     `json:"min_length" mapstructure:"min_length"`         // Minimum length for lncRNA filtering
 	LengthPenalty   float64 `json:"length_penalty" mapstructure:"length_penalty"` // Penalty factor for sub-threshold length (0=no penalty, 1=max)
 	ScoreThreshold  float64 `json:"score_threshold" mapstructure:"score_threshold"` // Minimum confidence score to keep a transcript
@@ -105,6 +107,8 @@ func NewConfig() *Config {
 	return &Config{
 		RunID:           uuid.New().String(),
 		Threads:         0,
+		Assembler:       "trinity",
+		Stranded:        "unstranded",
 		MinLncRNALength: 200,
 		LengthPenalty:   0.5,
 		ScoreThreshold:  0.5,
@@ -171,6 +175,8 @@ func Load(f *pflag.FlagSet, configFile string) (*Config, error) {
 			"length_penalty":       "LengthPenalty",
 			"score_threshold":      "ScoreThreshold",
 			"email":                "Email",
+			"assembler":            "Assembler",
+			"stranded":             "Stranded",
 		}
 
 		// Only load flags that were explicitly set by the user

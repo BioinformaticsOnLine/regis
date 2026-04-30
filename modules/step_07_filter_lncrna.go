@@ -470,6 +470,16 @@ func quantifyExpression(ctx context.Context, cfg *config.Config, gtfFile, bamFil
 		args = append(args, "-p")
 	}
 
+	// Add featureCounts strandedness flag
+	// -s 0: unstranded (default), -s 1: stranded (fr/f), -s 2: reversely stranded (rf/r)
+	strandedOpt := "0"
+	if cfg.Stranded == "rf" || cfg.Stranded == "r" {
+		strandedOpt = "2"
+	} else if cfg.Stranded == "fr" || cfg.Stranded == "f" {
+		strandedOpt = "1"
+	}
+	args = append(args, "-s", strandedOpt)
+
 	args = append(args, bamFile)
 
 	if err := utils.RunCommand(ctx, "featureCounts", args...); err != nil {

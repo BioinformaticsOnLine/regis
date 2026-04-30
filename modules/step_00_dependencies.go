@@ -51,10 +51,16 @@ func Step00CheckDependencies(ctx context.Context, cfg *config.Config) error {
 			}
 		}
 	} else if cfg.Method == "denovo" {
-		// Trinity sometimes installed as Trinity or trinity
-		if _, err := exec.LookPath("Trinity"); err != nil {
-			if _, err := exec.LookPath("trinity"); err != nil {
-				missingTools = append(missingTools, "Trinity")
+		if cfg.Assembler == "rnabloom" {
+			if _, err := exec.LookPath("rnabloom"); err != nil {
+				missingTools = append(missingTools, "rnabloom")
+			}
+		} else {
+			// Trinity sometimes installed as Trinity or trinity
+			if _, err := exec.LookPath("Trinity"); err != nil {
+				if _, err := exec.LookPath("trinity"); err != nil {
+					missingTools = append(missingTools, "Trinity")
+				}
 			}
 		}
 	}
@@ -144,6 +150,7 @@ func logToolVersions() {
 		{"cpat.py", "--version"},
 		{"multiqc", "--version"},
 		{"Trinity", "--version"},
+		{"rnabloom", "-v"},
 		{"featureCounts", "-v"}, // Subread package
 		{"IntaRNA", "--version"},
 	}

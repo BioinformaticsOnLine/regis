@@ -147,6 +147,59 @@ func CollectParameters() (*config.Config, error) {
 	}
 	cfg.Method = method
 
+	// Assembler selection (only for de novo)
+	if method == "denovo" {
+		var assembler string
+		assemblerForm := huh.NewForm(
+			huh.NewGroup(
+				huh.NewSelect[string]().
+					Title("De Novo Assembler").
+					Options(
+						huh.NewOption("Trinity (established, memory-heavy)", "trinity"),
+						huh.NewOption("RNA-Bloom (fast, memory-efficient)", "rnabloom"),
+					).
+					Value(&assembler),
+			),
+		)
+
+		if err := assemblerForm.Run(); err != nil {
+			return nil, err
+		}
+		cfg.Assembler = assembler
+	}
+
+	// Strandedness selection
+	var stranded string
+	strandedOptions := []huh.Option[string]{
+		huh.NewOption("Unstranded (Standard)", "unstranded"),
+	}
+	
+	if dataType == "paired" {
+		strandedOptions = append(strandedOptions, 
+			huh.NewOption("RF (Reverse-Forward, typical dUTP)", "rf"),
+			huh.NewOption("FR (Forward-Reverse)", "fr"),
+		)
+	} else {
+		strandedOptions = append(strandedOptions, 
+			huh.NewOption("F (Forward)", "f"),
+			huh.NewOption("R (Reverse)", "r"),
+		)
+	}
+
+	strandedForm := huh.NewForm(
+		huh.NewGroup(
+			huh.NewSelect[string]().
+				Title("Library Strandedness").
+				Options(strandedOptions...).
+				Value(&stranded),
+		),
+	)
+
+	if err := strandedForm.Run(); err != nil {
+		return nil, err
+	}
+	cfg.Stranded = stranded
+
 	// File inputs
 	var file1, file2, reference, gtf, outputDir string
 

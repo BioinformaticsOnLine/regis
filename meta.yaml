@@ -1,5 +1,5 @@
 {% set name = "regis" %}
-{% set version = "1.0.8" %}
+{% set version = "1.1.0" %}
 
 package:
   name: {{ name|lower }}
@@ -76,6 +76,7 @@ requirements:
     
     # Assembly tools
     - trinity >=2.15.2
+    - rnabloom >=2.0.1
     - hisat2 >=2.2.1
     - samtools >=1.22.1
     - stringtie >=2.1.7,<2.2  # Relax version constraint

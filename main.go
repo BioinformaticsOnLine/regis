@@ -89,6 +89,12 @@ func main() {
 	// rRNA filtering
 	pflag.Bool("sortmerna", false, "Enable rRNA filtering (recommended)")
 
+	// De novo assembler
+	pflag.String("assembler", "trinity", "De novo assembler: 'trinity' or 'rnabloom'")
+
+	// Strandedness
+	pflag.String("stranded", "unstranded", "Library strandedness: 'unstranded', 'rf', 'fr', 'f', 'r'")
+
 	// Config file
 	configFile := pflag.String("config", "", "Path to configuration file")
 
@@ -389,8 +395,10 @@ func runPipeline(ctx context.Context, cfg *config.Config, program *tea.Program) 
 	stepName := "De Novo Assembly with Trinity"
 	if cfg.Method == "reference" {
 		stepName = "Reference-based Alignment with HISAT2"
+	} else if cfg.Assembler == "rnabloom" {
+		stepName = "De Novo Assembly with RNA-Bloom"
 	}
-	tui.SendStepStart(program, 4, stepName, "hisat2/trinity")
+	tui.SendStepStart(program, 4, stepName, "hisat2/trinity/rnabloom")
 	if err := modules.Step04AlignAssembly(ctx, cfg); err != nil {
 		tui.SendStepComplete(program, 4, false, 0)
 		return fmt.Errorf("Step 4 failed: %w", err)

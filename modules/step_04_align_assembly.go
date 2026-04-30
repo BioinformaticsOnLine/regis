@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/BioinformaticsOnLine/regis/config"
@@ -17,6 +18,9 @@ func Step04AlignAssembly(ctx context.Context, cfg *config.Config) error {
 	stepStart := time.Now()
 
 	if cfg.Method == "denovo" {
+		if cfg.Assembler == "rnabloom" {
+			return runRNABloomAssembly(ctx, cfg, stepStart)
+		}
 		return runDeNovoAssembly(ctx, cfg, stepStart)
 	} else if cfg.Method == "reference" {
 		return runReferenceAlignment(ctx, cfg, stepStart)
@@ -44,6 +48,10 @@ func runDeNovoAssembly(ctx context.Context, cfg *config.Config, stepStart time.T
 
 	var args []string
 	args = append(args, "--seqType", "fq")
+
+	if cfg.Stranded != "unstranded" {
+		args = append(args, "--SS_lib_type", strings.ToUpper(cfg.Stranded))
+	}
 
 	if cfg.DataType == "paired" {
 		args = append(args, "--left", cfg.File1, "--right", cfg.File2)
@@ -80,6 +88,74 @@ func runDeNovoAssembly(ctx context.Context, cfg *config.Config, stepStart time.T
 	return nil
 }
 
+// runRNABloomAssembly runs RNA-Bloom de novo assembly
+func runRNABloomAssembly(ctx context.Context, cfg *config.Config, stepStart time.Time) error {
+	utils.StepHeader(4, "De Novo Assembly with RNA-Bloom")
+
+	// Create output directories
+	assemblyDir := filepath.Join(cfg.OutputDir, "05_assembly")
+	rnabloomOutDir := filepath.Join(assemblyDir, "rnabloom_out")
+	cpc2Dir := filepath.Join(cfg.OutputDir, "06_cpc2")
+	if err := utils.CreateDirs(assemblyDir, rnabloomOutDir, cpc2Dir); err != nil {
+		return fmt.Errorf("failed to create assembly directories: %w", err)
+	}
+
+	// Build RNA-Bloom command
+	utils.ShowProgress(fmt.Sprintf("Running RNA-Bloom (using %d threads)", cfg.Threads))
+
+	var args []string
+
+	if cfg.Stranded != "unstranded" {
+		args = append(args, "-stranded")
+	}
+
+	if cfg.DataType == "paired" {
+		if cfg.Stranded == "rf" {
+			args = append(args, "-left", cfg.File2, "-right", cfg.File1, "-revcomp-right")
+		} else if cfg.Stranded == "fr" {
+			args = append(args, "-left", cfg.File1, "-right", cfg.File2, "-revcomp-right")
+		} else {
+			// For non-stranded paired-end data, use -revcomp-right
+			args = append(args, "-left", cfg.File1, "-right", cfg.File2, "-revcomp-right")
+		}
+	} else {
+		// Single-end reads
+		if cfg.Stranded == "r" {
+			args = append(args, "-ser", cfg.File1)
+		} else {
+			args = append(args, "-sef", cfg.File1)
+		}
+	}
+
+	args = append(args,
+		"-t", strconv.Itoa(cfg.Threads),
+		"-outdir", rnabloomOutDir,
+	)
+
+	// Run RNA-Bloom
+	if err := utils.RunCommand(ctx, "rnabloom", args...); err != nil {
+		return fmt.Errorf("RNA-Bloom failed: %w", err)
+	}
+
+	// Verify RNA-Bloom output
+	// RNA-Bloom produces rnabloom.transcripts.fa (transcripts longer than 200bp)
+	rnabloomFasta := filepath.Join(rnabloomOutDir, "rnabloom.transcripts.fa")
+	if !utils.FileExists(rnabloomFasta) {
+		return fmt.Errorf("RNA-Bloom output missing: %s", rnabloomFasta)
+	}
+
+	// Copy RNA-Bloom output to CPC2 directory (same location as Trinity for downstream compatibility)
+	transcriptsFa := filepath.Join(cpc2Dir, "transcripts.fa")
+	if err := utils.CopyFile(rnabloomFasta, transcriptsFa); err != nil {
+		return fmt.Errorf("failed to copy RNA-Bloom output: %w", err)
+	}
+
+	utils.StepComplete(3, "De Novo Assembly with RNA-Bloom", stepStart)
+	utils.Info("RNA-Bloom assembly complete", zap.String("output", rnabloomFasta))
+
+	return nil
+}
+
 // runReferenceAlignment runs HISAT2 alignment and StringTie assembly
 func runReferenceAlignment(ctx context.Context, cfg *config.Config, stepStart time.Time) error {
 	utils.StepHeader(4, "Reference-based Alignment with HISAT2")
@@ -110,6 +186,10 @@ func runReferenceAlignment(ctx context.Context, cfg *config.Config, stepStart ti
 
 	var hisat2Args []string
 	hisat2Args = append(hisat2Args, "-p", strconv.Itoa(cfg.Threads), "-x", hisat2Index)
+
+	if cfg.Stranded != "unstranded" {
+		hisat2Args = append(hisat2Args, "--rna-strandness", strings.ToUpper(cfg.Stranded))
+	}
 
 	if cfg.DataType == "paired" {
 		hisat2Args = append(hisat2Args, "-1", cfg.File1, "-2", cfg.File2)
@@ -146,12 +226,20 @@ func runReferenceAlignment(ctx context.Context, cfg *config.Config, stepStart ti
 	transcriptsGtf := filepath.Join(assemblyDir, "transcripts.gtf")
 	utils.ShowProgress(fmt.Sprintf("Running StringTie (using %d threads)", cfg.Threads))
 
-	if err := utils.RunCommand(ctx, "stringtie",
+	stringtieArgs := []string{
 		alignedBam,
 		"-p", strconv.Itoa(cfg.Threads),
 		"-G", cfg.GTF,
 		"-o", transcriptsGtf,
-	); err != nil {
+	}
+
+	if cfg.Stranded == "rf" || cfg.Stranded == "r" {
+		stringtieArgs = append(stringtieArgs, "--rf")
+	} else if cfg.Stranded == "fr" || cfg.Stranded == "f" {
+		stringtieArgs = append(stringtieArgs, "--fr")
+	}
+
+	if err := utils.RunCommand(ctx, "stringtie", stringtieArgs...); err != nil {
 		return fmt.Errorf("StringTie failed: %w", err)
 	}
 

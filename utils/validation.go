@@ -25,6 +25,34 @@ func ValidateConfig(cfg *config.Config) error {
 		return fmt.Errorf("invalid method: %s (must be 'denovo' or 'reference')", cfg.Method)
 	}
 
+	// Validate and normalize assembler (only relevant for denovo)
+	if cfg.Assembler == "" {
+		cfg.Assembler = "trinity"
+	}
+	cfg.Assembler = strings.ToLower(cfg.Assembler)
+	if cfg.Assembler != "trinity" && cfg.Assembler != "rnabloom" {
+		return fmt.Errorf("invalid assembler: %s (must be 'trinity' or 'rnabloom')", cfg.Assembler)
+	}
+
+	// Validate and normalize strandedness
+	if cfg.Stranded == "" {
+		cfg.Stranded = "unstranded"
+	}
+	cfg.Stranded = strings.ToLower(cfg.Stranded)
+	
+	validStrand := false
+	if cfg.Stranded == "unstranded" {
+		validStrand = true
+	} else if cfg.DataType == "paired" && (cfg.Stranded == "rf" || cfg.Stranded == "fr") {
+		validStrand = true
+	} else if cfg.DataType == "single" && (cfg.Stranded == "f" || cfg.Stranded == "r") {
+		validStrand = true
+	}
+
+	if !validStrand {
+		return fmt.Errorf("invalid strandedness '%s' for data_type '%s'. Valid options: unstranded, rf/fr (paired), f/r (single)", cfg.Stranded, cfg.DataType)
+	}
+
 	// Validate required files
 	if cfg.File1 == "" {
 		return fmt.Errorf("file1 is required")
