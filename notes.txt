@@ -68,16 +68,16 @@ go build -o regis . && ./regis --version
 
 # ─── v1.0.6: Fix libgcc>=15 / glibc solver conflict ─────────────────────────
 # IMPORTANT: Build must be done on Linux (or use conda-build on Linux CI)
-# The explicit `__glibc >=2.17` virtual package constraint in meta.yaml 
+# The explicit `__glibc >=2.17` virtual package constraint in meta.yaml
 # prevents libgcc>=15 injection and ensures compatibility with older and newer glibc.
 
 # Step 1: Build linux-64 package (run this ON a Linux machine)
 conda build . --output-folder ./conda-bld/ -c bioconda -c conda-forge -c jitendralab
 
 # Step 2: Upload noarch build
-anaconda upload -u jitendralab ./conda-bld/noarch/regis-1.1.2-*.tar.bz2
+anaconda upload -u jitendralab ./conda-bld/noarch/regis-1.1.3-*.tar.bz2
 # or if .conda format:
-anaconda upload -u jitendralab ./conda-bld/noarch/regis-1.1.2-*.conda
+anaconda upload -u jitendralab ./conda-bld/noarch/regis-1.1.3-*.conda
 
 # Step 3: Tag the release
 git add meta.yaml
