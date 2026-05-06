@@ -74,10 +74,10 @@ go build -o regis . && ./regis --version
 # Step 1: Build linux-64 package (run this ON a Linux machine)
 conda build . --output-folder ./conda-bld/ -c bioconda -c conda-forge -c jitendralab
 
-# Step 2: Upload linux-64 build
-anaconda upload -u jitendralab ./conda-bld/linux-64/regis-1.0.6-*.tar.bz2
+# Step 2: Upload noarch build
+anaconda upload -u jitendralab ./conda-bld/noarch/regis-1.1.2-*.tar.bz2
 # or if .conda format:
-anaconda upload -u jitendralab ./conda-bld/linux-64/regis-1.0.6-*.conda
+anaconda upload -u jitendralab ./conda-bld/noarch/regis-1.1.2-*.conda
 
 # Step 3: Tag the release
 git add meta.yaml
