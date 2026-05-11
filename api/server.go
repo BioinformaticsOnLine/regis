@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/BioinformaticsOnLine/regis/api/db"
@@ -47,17 +48,56 @@ type Server struct {
 	Validator *validator.Validate
 }
 
+// Default upload limit for FASTQ/FASTA and similar (Fiber default is 4 MiB, which yields 413 + confusing CORS errors in browsers).
+const defaultBodyLimitBytes = 5 * 1024 * 1024 * 1024 // 5 GiB (large FASTQ uploads)
+
+// allowDevCORSOrigin permits browser calls from local dev and typical private LAN URLs (e.g. Vite on http://192.168.x.x:5173).
+func allowDevCORSOrigin(origin string) bool {
+	if origin == "" {
+		return true
+	}
+	u := strings.ToLower(origin)
+	switch {
+	case strings.HasPrefix(u, "http://localhost"), strings.HasPrefix(u, "https://localhost"):
+		return true
+	case strings.HasPrefix(u, "http://127.0.0.1"), strings.HasPrefix(u, "https://127.0.0.1"):
+		return true
+	case strings.HasPrefix(u, "http://192.168."), strings.HasPrefix(u, "https://192.168."):
+		return true
+	case strings.HasPrefix(u, "http://10."), strings.HasPrefix(u, "https://10."):
+		return true
+	case strings.HasPrefix(u, "http://172.17."), strings.HasPrefix(u, "http://172.18."), strings.HasPrefix(u, "http://172.19."),
+		strings.HasPrefix(u, "http://172.20."), strings.HasPrefix(u, "http://172.21."), strings.HasPrefix(u, "http://172.22."),
+		strings.HasPrefix(u, "http://172.23."), strings.HasPrefix(u, "http://172.24."), strings.HasPrefix(u, "http://172.25."),
+		strings.HasPrefix(u, "http://172.26."), strings.HasPrefix(u, "http://172.27."), strings.HasPrefix(u, "http://172.28."),
+		strings.HasPrefix(u, "http://172.29."), strings.HasPrefix(u, "http://172.30."), strings.HasPrefix(u, "http://172.31."),
+		strings.HasPrefix(u, "https://172.17."), strings.HasPrefix(u, "https://172.18."), strings.HasPrefix(u, "https://172.19."),
+		strings.HasPrefix(u, "https://172.20."), strings.HasPrefix(u, "https://172.21."), strings.HasPrefix(u, "https://172.22."),
+		strings.HasPrefix(u, "https://172.23."), strings.HasPrefix(u, "https://172.24."), strings.HasPrefix(u, "https://172.25."),
+		strings.HasPrefix(u, "https://172.26."), strings.HasPrefix(u, "https://172.27."), strings.HasPrefix(u, "https://172.28."),
+		strings.HasPrefix(u, "https://172.29."), strings.HasPrefix(u, "https://172.30."), strings.HasPrefix(u, "https://172.31."):
+		return true
+	default:
+		return false
+	}
+}
+
 // NewServer creates a new API server instance
 func NewServer(cfg *config.Config) *Server {
 	app := fiber.New(fiber.Config{
 		AppName:               "REGIS Pipeline API",
 		DisableStartupMessage: false,
+		BodyLimit:             defaultBodyLimitBytes,
 	})
 
 	// Middleware
 	app.Use(logger.New())  // Request logging
 	app.Use(recover.New()) // Recover from panics
-	app.Use(cors.New())    // Enable CORS for frontend
+	app.Use(cors.New(cors.Config{
+		AllowOriginsFunc: allowDevCORSOrigin,
+		AllowMethods:     "GET,POST,PUT,PATCH,DELETE,OPTIONS,HEAD",
+		AllowHeaders:     "Origin, Content-Type, Accept, Authorization, X-API-Key, X-Requested-With",
+	}))
 
 	server := &Server{
 		App:       app,
@@ -103,7 +143,7 @@ func (s *Server) Listen(addr string) error {
 func StartServer(port, jobDir string) {
 	// Initialize Database
 	db.Init("regis.db")
-	
+
 	// Record Start Time
 	handlers.ServerStartTime = time.Now()
 

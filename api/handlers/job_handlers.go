@@ -370,8 +370,8 @@ func GetStats(c *fiber.Ctx) error {
 	db.GetDB().Model(&Job{}).Where("status = ?", "completed").Count(&completedJobs)
 	db.GetDB().Model(&Job{}).Where("status = ?", "failed").Count(&failedJobs)
 
-	// Get last submitted job
-	result := db.GetDB().Order("start_time desc").First(&lastJob)
+	// Latest job by start_time (empty table is normal — avoid First(), which logs ErrRecordNotFound)
+	result := db.GetDB().Order("start_time desc").Limit(1).Find(&lastJob)
 
 	// 2. System Statistics (Real Data)
 	v, _ := mem.VirtualMemory()
@@ -396,8 +396,8 @@ func GetStats(c *fiber.Ctx) error {
 			"failed":    failedJobs,
 		},
 		"system": fiber.Map{
-			"cpus":        runtime.NumCPU(),
-			"cpu_percent": cpuPercent,
+			"cpus":            runtime.NumCPU(),
+			"cpu_percent":     cpuPercent,
 			"memory_used_mb":  v.Used / 1024 / 1024,
 			"memory_total_mb": v.Total / 1024 / 1024,
 			"memory_percent":  v.UsedPercent,
@@ -405,7 +405,7 @@ func GetStats(c *fiber.Ctx) error {
 		"last_job_submitted": nil,
 	}
 
-	if result.Error == nil && !lastJob.StartTime.IsZero() {
+	if result.RowsAffected > 0 && !lastJob.StartTime.IsZero() {
 		response["last_job_submitted"] = lastJob.StartTime.Format(time.RFC3339)
 	}
 
