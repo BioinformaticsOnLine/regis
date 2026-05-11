@@ -34,10 +34,16 @@ build:
     # Use system GCC (not conda-forge GCC 15) to avoid libgcc>=15 run_exports.
     # System GCC on modern Ubuntu/CentOS links against glibc 2.17 ABI.
     export CGO_ENABLED=1
-    export CC=gcc
-    export CXX=g++
-    # Strip debug info and set version; link only minimal system libs
-    export CGO_LDFLAGS="-Wl,--as-needed"
+    if [[ "$(uname -s)" == Linux ]]; then
+      export CC=gcc
+      export CXX=g++
+      # GNU ld only; Apple ld rejects -Wl,--as-needed (breaks osx-64 / Rosetta builds).
+      export CGO_LDFLAGS="-Wl,--as-needed"
+    else
+      unset CGO_LDFLAGS
+      export CC="${CC:-gcc}"
+      export CXX="${CXX:-g++}"
+    fi
     
     # Build with version info and optimizations
     go build -ldflags="-s -w -X github.com/BioinformaticsOnLine/regis/version.Version={{ version }}" -o regis .
