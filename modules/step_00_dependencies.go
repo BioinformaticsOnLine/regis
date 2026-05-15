@@ -20,7 +20,7 @@ func Step00CheckDependencies(ctx context.Context, cfg *config.Config) error {
 	// 1. Core Tools (always required)
 	coreTools := []string{
 		"fastqc",
-		"trimmomatic",
+		"fastp",
 
 		"gffcompare",
 		"RNAfold",
@@ -139,7 +139,7 @@ func logToolVersions() {
 		arg  string
 	}{
 		{"fastqc", "--version"},
-		{"trimmomatic", "-version"},
+		{"fastp", "--version"},
 		{"samtools", "--version"},
 		{"stringtie", "--version"},
 		{"gffread", "--version"},

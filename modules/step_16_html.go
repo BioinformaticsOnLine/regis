@@ -354,25 +354,25 @@ func getModuleDetails(s *PipelineSummary, cfg *config.Config) []ModuleRenderData
 		ExtraLinks: fastqcLinks,
 	})
 
-	// 2. Trimmomatic
+	// 2. fastp
 	modules = append(modules, ModuleRenderData{
 		ID:       2,
-		Name:     "Adapter Trimming with Trimmomatic",
+		Name:     "Quality Trimming with fastp",
 		Icon:     "✂️",
-		Duration: getDuration("Trimmomatic"),
+		Duration: getDuration("fastp"),
 		Status:   "Success",
 		Description: []string{
-			"Removed Illumina adapter sequences",
-			"Trimmed low-quality bases (Q<20)",
+			"Auto-detected and removed adapter sequences",
+			"Trimmed low-quality bases",
 			"Filtered reads <36bp minimum length",
 		},
 		Inputs: []string{
 			"Raw FASTQ files",
-			"TruSeq3-PE adapter sequences",
 		},
 		Outputs: []string{
 			"02_trimming/paired_1.fastq",
 			"02_trimming/paired_2.fastq",
+			"02_trimming/fastp_report.html",
 		},
 		Metrics: s.Trimmomatic,
 	})
@@ -1067,7 +1067,7 @@ func getHTMLTemplate() string {
                                         {{end}}
                                     {{end}}
 
-                                    {{if eq .Name "Adapter Trimming with Trimmomatic"}}
+                                    {{if eq .Name "Quality Trimming with fastp"}}
                                         {{with .Metrics}}
                                         <div class="flex justify-between text-sm"><span class="text-gray-600">Input Pairs:</span> <span class="font-medium">{{.InputReadPairs}}</span></div>
                                         <div class="flex justify-between text-sm"><span class="text-gray-600">Surviving:</span> <span class="font-medium">{{.BothSurviving}}</span></div>

@@ -39,7 +39,7 @@ type PipelineSummary struct {
 
 	// Module metrics (ALL 15 modules)
 	FastQC          *FastQCMetrics          `json:"fastqc,omitempty"`
-	Trimmomatic     *TrimmomaticMetrics     `json:"trimmomatic,omitempty"`
+	Trimmomatic     *TrimmomaticMetrics     `json:"trimmomatic,omitempty"` // Kept as "trimmomatic" JSON key for API backward compat
 	SortMeRNA       *SortMeRNAMetrics       `json:"sortmerna,omitempty"`
 	HISAT2          *HISAT2Metrics          `json:"hisat2,omitempty"`
 	StringTie       *StringTieMetrics       `json:"stringtie,omitempty"`
@@ -588,30 +588,43 @@ func collectFastQCMetrics(cfg *config.Config) *FastQCMetrics {
 	return metrics
 }
 
-// collectTrimmomaticMetrics extracts Trimmomatic metrics from pipeline.log
+// collectTrimmomaticMetrics extracts trimming metrics from fastp JSON report
 func collectTrimmomaticMetrics(cfg *config.Config) *TrimmomaticMetrics {
 	metrics := &TrimmomaticMetrics{}
-	logFile := filepath.Join(cfg.OutputDir, "pipeline.log")
+	jsonFile := filepath.Join(cfg.OutputDir, "02_trimming", "fastp_report.json")
 
-	file, err := os.Open(logFile)
+	data, err := os.ReadFile(jsonFile)
 	if err != nil {
 		return metrics
 	}
-	defer file.Close()
 
-	// Regex for: Input Read Pairs: 7253932 Both Surviving: 7233841 (99.72%) ...
-	re := regexp.MustCompile(`Input Read Pairs: (\d+) Both Surviving: (\d+) \(([\d\.]+)%\)`)
-
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := scanner.Text()
-		if matches := re.FindStringSubmatch(line); matches != nil {
-			metrics.InputReadPairs, _ = strconv.ParseInt(matches[1], 10, 64)
-			metrics.BothSurviving, _ = strconv.ParseInt(matches[2], 10, 64)
-			metrics.SurvivalRate, _ = strconv.ParseFloat(matches[3], 64)
-			break // Found the line
-		}
+	// Parse fastp JSON structure
+	var report struct {
+		Summary struct {
+			BeforeFiltering struct {
+				TotalReads int64 `json:"total_reads"`
+			} `json:"before_filtering"`
+			AfterFiltering struct {
+				TotalReads int64 `json:"total_reads"`
+			} `json:"after_filtering"`
+		} `json:"summary"`
+		FilteringResult struct {
+			PassedFilterReads int64 `json:"passed_filter_reads"`
+		} `json:"filtering_result"`
 	}
+
+	if err := json.Unmarshal(data, &report); err != nil {
+		return metrics
+	}
+
+	// For paired-end, fastp counts individual reads; divide by 2 for read pairs
+	metrics.InputReadPairs = report.Summary.BeforeFiltering.TotalReads / 2
+	metrics.BothSurviving = report.FilteringResult.PassedFilterReads / 2
+
+	if metrics.InputReadPairs > 0 {
+		metrics.SurvivalRate = float64(metrics.BothSurviving) / float64(metrics.InputReadPairs) * 100.0
+	}
+
 	return metrics
 }
 
@@ -717,7 +730,7 @@ func getStepID(name string) int {
 	name = strings.ToLower(name)
 	if strings.Contains(name, "fastqc") {
 		return 1
-	} else if strings.Contains(name, "trimmomatic") {
+	} else if strings.Contains(name, "fastp") {
 		return 2
 	} else if strings.Contains(name, "sortmerna") {
 		return 3
@@ -754,7 +767,7 @@ func getStepID(name string) int {
 // getStepName returns the name for a given step number
 func getStepName(num int) string {
 	names := map[int]string{
-		1: "FastQC", 2: "Trimmomatic", 3: "SortMeRNA", 4: "HISAT2/StringTie",
+		1: "FastQC", 2: "fastp", 3: "SortMeRNA", 4: "HISAT2/StringTie",
 		5: "CPC2", 6: "CPAT", 7: "lncRNA Filtering", 8: "RNAfold",
 		9: "LncTar", 10: "IntaRNA", 11: "Consensus", 12: "Enrichment",
 		13: "RSeQC", 14: "IGV", 15: "MultiQC", 16: "Report",
@@ -882,7 +895,7 @@ Metrics:
 {{end}}
 {{if .Trimmomatic}}
 ------------------------------------------
-Module: Trimmomatic Adapter Trimming
+Module: fastp Quality Trimming
 ------------------------------------------
 Input:
   - Raw FASTQ files
@@ -892,6 +905,8 @@ Output:
   - 02_trimming/paired_2.fastq
   - 02_trimming/unpaired_1.fastq
   - 02_trimming/unpaired_2.fastq
+  - 02_trimming/fastp_report.json
+  - 02_trimming/fastp_report.html
 
 Metrics:
   Input Read Pairs: {{.Trimmomatic.InputReadPairs}}

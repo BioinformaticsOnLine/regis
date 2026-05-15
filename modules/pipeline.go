@@ -42,9 +42,9 @@ func (p *PipelineRunner) RunHeadless(ctx context.Context) error {
 		return err
 	}
 
-	// Step 2: Trimmomatic
-	if err := runStep(ctx, 2, "Adapter Trimming with Trimmomatic", func() error {
-		return Step02TrimTrimmomatic(ctx, cfg)
+	// Step 2: fastp
+	if err := runStep(ctx, 2, "Quality Trimming with fastp", func() error {
+		return Step02TrimFastp(ctx, cfg)
 	}); err != nil {
 		return err
 	}

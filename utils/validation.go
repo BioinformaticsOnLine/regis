@@ -100,7 +100,7 @@ func ValidateConfig(cfg *config.Config) error {
 	if cfg.Threads <= 0 {
 		cfg.Threads = availableCPUs
 	} else if cfg.Threads > availableCPUs {
-		// Requested more threads than available — clamp to avoid Trimmomatic / HISAT2 errors
+		// Requested more threads than available — clamp to avoid fastp / HISAT2 errors
 		cfg.Threads = availableCPUs
 	}
 

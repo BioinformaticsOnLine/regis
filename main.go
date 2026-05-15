@@ -373,9 +373,9 @@ func runPipeline(ctx context.Context, cfg *config.Config, program *tea.Program) 
 	}
 	tui.SendStepComplete(program, 1, true, 0)
 
-	// Step 2: Trimmomatic
-	tui.SendStepStart(program, 2, "Adapter Trimming with Trimmomatic", "trimmomatic")
-	if err := modules.Step02TrimTrimmomatic(ctx, cfg); err != nil {
+	// Step 2: fastp
+	tui.SendStepStart(program, 2, "Quality Trimming with fastp", "fastp")
+	if err := modules.Step02TrimFastp(ctx, cfg); err != nil {
 		tui.SendStepComplete(program, 2, false, 0)
 		return fmt.Errorf("Step 2 failed: %w", err)
 	}
