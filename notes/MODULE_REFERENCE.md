@@ -1,4 +1,4 @@
-# REGIS Module Reference (v1.0.5)
+# REGIS Module Reference (v1.1.4)
 
 This document provides an in-depth reference for each pipeline module, including the exact commands executed, input/output files, and implementation details.
 
@@ -9,7 +9,7 @@ This document provides an in-depth reference for each pipeline module, including
 1. [Pipeline Architecture](#pipeline-architecture)
 2. [Step 0: Dependency Check](#step-0-dependency-check)
 3. [Step 1: FastQC](#step-1-fastqc)
-4. [Step 2: Trimmomatic](#step-2-trimmomatic)
+4. [Step 2: fastp](#step-2-fastp)
 5. [Step 3: SortMeRNA](#step-3-sortmerna)
 6. [Step 4: Alignment/Assembly](#step-4-alignmentassembly)
 7. [Step 5: CPC2](#step-5-cpc2)
@@ -39,7 +39,7 @@ runPipeline(ctx, cfg, program)
 ┌─────────────────────────────────────────────────────────┐
 │ Step 0:  modules.Step00CheckDependencies()              │
 │ Step 1:  modules.Step01QCFastQC()                       │
-│ Step 2:  modules.Step02TrimTrimmomatic()                │
+│ Step 2:  modules.Step02TrimFastp()                      │
 │ Step 3:  modules.Step03SortMeRNA()        [if enabled]  │
 │ Step 4:  modules.Step04AlignAssembly()                  │
 │ Step 5:  modules.Step05CPC2()                           │
@@ -67,7 +67,7 @@ All modules are in: `modules/`
 | `slurm.go` | Slurm sbatch script generation |
 | `step_00_dependencies.go` | Tool availability checks |
 | `step_01_qc_fastqc.go` | FastQC quality control |
-| `step_02_trim_trimmomatic.go` | Adapter trimming |
+| `step_02_trim_fastp.go` | Quality trimming (fastp) |
 | `step_03_sortmerna.go` | rRNA filtering |
 | `step_04_align_assembly.go` | HISAT2/Trinity |
 | `step_05_cpc2.go` | CPC2 coding potential |
@@ -99,7 +99,7 @@ Verifies all required external tools are installed and accessible in `$PATH`.
 ```go
 coreTools := []string{
     "fastqc",
-    "trimmomatic",
+    "fastp",
     "gffcompare",
     "RNAfold",
     "bedtools",
@@ -163,56 +163,48 @@ fastqc -o 01_fastqc -t {threads} {file1}
 
 ---
 
-## Step 2: Trimmomatic
+## Step 2: fastp
 
-**File:** `step_02_trim_trimmomatic.go`
+**File:** `step_02_trim_fastp.go`
 
 ### Purpose
-Removes adapters and low-quality bases from reads.
+Quality-trims reads, auto-detects/removes adapters, and emits HTML/JSON QC reports.
 
 ### Commands Executed
 
 ```bash
 # Paired-end
-trimmomatic PE \
-    -threads {threads} \
-    {file1} {file2} \
-    02_trimmomatic/trimmed_R1.fastq.gz 02_trimmomatic/unpaired_R1.fastq.gz \
-    02_trimmomatic/trimmed_R2.fastq.gz 02_trimmomatic/unpaired_R2.fastq.gz \
-    ILLUMINACLIP:{adapters}:2:30:10 \
-    LEADING:3 TRAILING:3 \
-    SLIDINGWINDOW:4:15 \
-    MINLEN:36
+fastp -i {file1} -I {file2} \
+    -o 02_trimming/paired_1.fastq -O 02_trimming/paired_2.fastq \
+    --unpaired1 02_trimming/unpaired_1.fastq --unpaired2 02_trimming/unpaired_2.fastq \
+    -w {threads} -l 36 \
+    -j 02_trimming/fastp_report.json -h 02_trimming/fastp_report.html
 
 # Single-end
-trimmomatic SE \
-    -threads {threads} \
-    {file1} \
-    02_trimmomatic/trimmed.fastq.gz \
-    ILLUMINACLIP:{adapters}:2:30:10 \
-    LEADING:3 TRAILING:3 \
-    SLIDINGWINDOW:4:15 \
-    MINLEN:36
+fastp -i {file1} -o 02_trimming/trimmed.fastq \
+    -w {threads} -l 36 \
+    -j 02_trimming/fastp_report.json -h 02_trimming/fastp_report.html
 ```
 
-### Trimmomatic Parameters
+### fastp Parameters
 
 | Parameter | Value | Description |
 |-----------|-------|-------------|
-| `ILLUMINACLIP` | `2:30:10` | Seed mismatches:palindrome:simple clip |
-| `LEADING` | `3` | Cut bases with quality < 3 from start |
-| `TRAILING` | `3` | Cut bases with quality < 3 from end |
-| `SLIDINGWINDOW` | `4:15` | 4bp window, avg quality < 15 = cut |
-| `MINLEN` | `36` | Drop reads shorter than 36bp |
+| `-w` | `{threads}` | Worker threads |
+| `-l` | `36` | Minimum read length after trimming |
+| `-j` / `-h` | reports | JSON and HTML QC reports |
 
-### Output Directory: `02_trimmomatic/`
+### Output Directory: `02_trimming/`
 
 | File | Description |
 |------|-------------|
-| `trimmed_R1.fastq.gz` | Trimmed forward reads |
-| `trimmed_R2.fastq.gz` | Trimmed reverse reads |
-| `unpaired_R1.fastq.gz` | Unpaired forward reads |
-| `unpaired_R2.fastq.gz` | Unpaired reverse reads |
+| `paired_1.fastq` | Trimmed forward reads (paired-end) |
+| `paired_2.fastq` | Trimmed reverse reads (paired-end) |
+| `unpaired_1.fastq` | Unpaired forward reads |
+| `unpaired_2.fastq` | Unpaired reverse reads |
+| `trimmed.fastq` | Trimmed reads (single-end) |
+| `fastp_report.json` | Trimming statistics (parsed by step 16 report) |
+| `fastp_report.html` | Interactive trimming report |
 
 ---
 
@@ -791,7 +783,7 @@ multiqc . \
 ### Supported Input Sources
 
 - `01_fastqc/` - FastQC reports
-- `02_trimmomatic/` - Trimming logs
+- `02_trimming/` - fastp-trimmed reads and reports
 - `04_alignment/` - HISAT2 logs
 - `08_lncrna_analysis/expression/` - featureCounts
 - `13_rseqc/` - RSeQC reports
@@ -826,7 +818,7 @@ type PipelineSummary struct {
     
     // Step Metrics
     FastQCMetrics           FastQCMetrics
-    TrimmomaticMetrics      TrimmomaticMetrics
+    TrimmomaticMetrics      TrimmomaticMetrics  // JSON key `trimmomatic`; populated from fastp_report.json
     SortMeRNAMetrics        SortMeRNAMetrics
     HISAT2Metrics           HISAT2Metrics
     StringTieMetrics        StringTieMetrics

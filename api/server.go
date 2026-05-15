@@ -28,7 +28,7 @@ func init() {
 }
 
 // @title REGIS Pipeline API
-// @version 1.0.5
+// @version 1.1.4
 // @description REST API for controlling the REGIS lncRNA identification pipeline.
 // @termsOfService http://swagger.io/terms/
 

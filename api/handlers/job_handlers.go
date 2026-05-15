@@ -12,6 +12,7 @@ import (
 	"github.com/BioinformaticsOnLine/regis/config"
 	"github.com/BioinformaticsOnLine/regis/modules"
 	"github.com/BioinformaticsOnLine/regis/utils"
+	"github.com/BioinformaticsOnLine/regis/version"
 	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
@@ -386,7 +387,7 @@ func GetStats(c *fiber.Ctx) error {
 			"uptime_seconds": time.Since(ServerStartTime).Seconds(),
 			"uptime_human":   time.Since(ServerStartTime).String(),
 			"start_time":     ServerStartTime.Format(time.RFC3339),
-			"version":        "1.0.5",
+			"version":        version.Version,
 		},
 		"jobs": fiber.Map{
 			"total":     totalJobs,

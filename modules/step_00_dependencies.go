@@ -123,7 +123,7 @@ func Step00CheckDependencies(ctx context.Context, cfg *config.Config) error {
 	if len(missingTools) > 0 {
 		errMsg := fmt.Sprintf("Missing required tools/files:\n  - %s\n\nPlease install them or ensure they are in your PATH/assets folder.", strings.Join(missingTools, "\n  - "))
 		utils.Error(errMsg)
-		return fmt.Errorf("dependency check failed: missing %d tools", len(missingTools))
+		return fmt.Errorf("dependency check failed: missing %s", strings.Join(missingTools, ", "))
 	}
 
 	// Log versions for key tools

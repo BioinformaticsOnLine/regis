@@ -1,6 +1,6 @@
-# REGIS v1.1.3 - RNA-seq Guided Identification System
+# REGIS v1.1.4 - RNA-seq Guided Identification System
 
-![Version](https://img.shields.io/badge/Version-1.1.3-brightgreen?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-1.1.4-brightgreen?style=for-the-badge)
 ![Go Version](https://img.shields.io/badge/Go-1.21%2B-00ADD8?style=for-the-badge&logo=go&logoColor=white)
 ![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20macOS-important?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-GPL_v3-blue?style=for-the-badge)
@@ -8,7 +8,7 @@
 
 **REGIS (RNA-seq Guided Identification System)** is a comprehensive, modular bioinformatics pipeline designed for the high-confidence identification and functional characterization of **Long Non-Coding RNAs (lncRNAs)**. 
 
-Re-engineered in **Go**, REGIS v1.1.3 brings a premium **Terminal User Interface (TUI)**, robust process management, REST API server, Slurm HPC support, and a seamless developer experience, while maintaining rigorous scientific accuracy.
+Re-engineered in **Go**, REGIS v1.1.4 brings a premium **Terminal User Interface (TUI)**, robust process management, REST API server, Slurm HPC support, and a seamless developer experience, while maintaining rigorous scientific accuracy.
 
 
 [![Typing SVG](https://readme-typing-svg.demolab.com?font=Fira+Code&size=30&duration=3000&pause=1000&color=00ADD8&center=true&vCenter=true&width=1000&lines=REGIS+%F0%9F%A7%AC+lncRNA+Identification+Pipeline;Built+with+Go+%7C+TUI+%7C+REST+API+%7C+SLURM+Support;NGS+Analysis+%E2%9A%A1+Fast+%E2%9A%A1+Scalable)](https://git.io/typing-svg)
@@ -19,7 +19,7 @@ Re-engineered in **Go**, REGIS v1.1.3 brings a premium **Terminal User Interface
 
 *   **🖥️ Modern TUI**: Real-time progress tracking, system resource monitoring (CPU/RAM), and beautiful visualizations using `Bubble Tea`.
 *   **🧬 Flexible Analysis**: Supports both **De Novo** (Trinity) and **Reference-based** (HISAT2/StringTie) assembly modes.
-*   **🛡️ Robust Quality Control**: Integrated FastQC, Trimmomatic, and **SortMeRNA** (rRNA filtering) for clean data.
+*   **🛡️ Robust Quality Control**: Integrated FastQC, **fastp** (quality trimming & adapter removal), and **SortMeRNA** (rRNA filtering) for clean data.
 *   **🎯 High-Confidence Filtering**: 
     *   Multi-step coding potential assessment using **CPC2** and **CPAT**.
     *   Strict length (>200nt) and probability thresholds.
@@ -39,7 +39,7 @@ Re-engineered in **Go**, REGIS v1.1.3 brings a premium **Terminal User Interface
 graph TD
     %% Nodes
     Input([Input FASTQ]) --> QC[01. FastQC]
-    QC --> Trim[02. Trimmomatic]
+    QC --> Trim[02. fastp]
     Trim --> Sort{SortMeRNA?}
     
     Sort -- Yes --> Clean([Cleaned Reads])
@@ -125,7 +125,7 @@ If you prefer to build from source, you will need to manually install dependenci
 2.  **External Tools**:
     ```bash
     conda create -n regis -c bioconda -c conda-forge \
-        fastqc trimmomatic sortmerna hisat2 trinity stringtie \
+        fastqc fastp sortmerna hisat2 trinity stringtie \
         samtools gffcompare seqkit bedtools subread \
         python=3.10 rna-seqc multiqc igv-reports sqlite
     conda activate regis
@@ -198,7 +198,7 @@ REGIS organizes results into a structured directory tree:
 ```text
 results_dir/
 ├── 01_fastqc/             # FastQC reports
-├── 02_trimmed/            # Cleaned FASTQ files
+├── 02_trimming/           # fastp-trimmed FASTQ + HTML/JSON reports
 ├── 03_sortmerna/          # rRNA filtered reads (if enabled)
 ├── 04_alignment/          # HISAT2 BAM files / Trinity Assembly
 ├── 05_assembly/           # StringTie GTF assemblies
@@ -254,6 +254,8 @@ REGIS wraps several academic tools. Please also cite:
 
 ### Quality Control & Preprocessing
 - **FastQC**: Andrews, S. (2010). FastQC: A Quality Control Tool for High Throughput Sequence Data. Available online at: http://www.bioinformatics.babraham.ac.uk/projects/fastqc
+
+- **fastp**: Chen, S., Zhou, Y., Chen, Y., & Gu, J. (2018). fastp: an ultra-fast all-in-one FASTQ preprocessor. *Bioinformatics*, 34(17), i884–i890. https://doi.org/10.1093/bioinformatics/bty560
 
 ### Alignment & Assembly
 - **HISAT2**: Kim, D., Paggi, J.M., Park, C., Bennett, C., & Salzberg, S.L. (2019). Graph-based genome alignment and genotyping with HISAT2 and HISAT-genotype. *Nature Biotechnology*, 37, 907-915. https://doi.org/10.1038/s41587-019-0201-4

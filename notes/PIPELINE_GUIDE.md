@@ -27,7 +27,7 @@ REGIS is a **state-of-the-art bioinformatics pipeline** for identifying and char
 
 ### **Pipeline Enhancements**
 - ✅ **SortMeRNA** - rRNA filtering with SILVA database (optional)
-- ✅ **Separate FastQC & Trimmomatic** - More granular QC control
+- ✅ **Separate FastQC & fastp** - More granular QC control
 - ✅ **17 Pipeline Steps** - From dependency check through HTML report
 - ✅ **Cross-tool Consensus** - LncTar + IntaRNA validation
 - ✅ **Enrichment Gene Lists** - getENRICH-ready output
@@ -72,7 +72,7 @@ regis-go/
 │   ├── slurm.go               # Slurm job script generation
 │   ├── step_00_dependencies.go # Tool availability checks
 │   ├── step_01_qc_fastqc.go    # FastQC quality control
-│   ├── step_02_trim_trimmomatic.go # Adapter trimming
+│   ├── step_02_trim_fastp.go       # Quality trimming (fastp)
 │   ├── step_03_sortmerna.go    # rRNA filtering (optional)
 │   ├── step_04_align_assembly.go # HISAT2/Trinity
 │   ├── step_05_cpc2.go         # Coding potential (CPC2)
@@ -431,7 +431,7 @@ REGIS v1.0.5 executes **17 steps** (Step 0-16):
 - Confirms LncTar script is accessible
 
 **Tools Checked:**
-- Core: `fastqc`, `trimmomatic`, `gffcompare`, `RNAfold`, `bedtools`
+- Core: `fastqc`, `fastp`, `gffcompare`, `RNAfold`, `bedtools`
 - Reference: `hisat2`, `samtools`, `stringtie`, `gffread`
 - De Novo: `Trinity`
 - Validation: `cpc2`, `cpat.py`
@@ -460,25 +460,26 @@ REGIS v1.0.5 executes **17 steps** (Step 0-16):
 
 ---
 
-### **Step 2: Adapter Trimming with Trimmomatic**
+### **Step 2: Quality Trimming with fastp**
 
-**Module:** `step_02_trim_trimmomatic.go`
+**Module:** `step_02_trim_fastp.go`
 
-**Tool:** Trimmomatic ≥0.39
+**Tool:** fastp ≥0.23.4
 
 **What it does:**
-- Removes adapter sequences
-- Quality trims reads (LEADING:3, TRAILING:3)
-- Removes short reads (MINLEN:36)
-- Sliding window quality filter (4:15)
+- Auto-detects and removes adapter sequences
+- Quality trims reads (fastp defaults)
+- Drops reads shorter than 36 bp (`-l 36`)
+- Writes JSON and HTML QC reports
 
 **Output:**
-- `02_trimmomatic/trimmed_R1.fastq.gz` - Trimmed forward reads
-- `02_trimmomatic/trimmed_R2.fastq.gz` - Trimmed reverse reads
-- `02_trimmomatic/unpaired_R1.fastq.gz` - Unpaired forward reads
-- `02_trimmomatic/unpaired_R2.fastq.gz` - Unpaired reverse reads
+- `02_trimming/paired_1.fastq` - Trimmed forward reads (paired-end)
+- `02_trimming/paired_2.fastq` - Trimmed reverse reads (paired-end)
+- `02_trimming/unpaired_1.fastq` / `unpaired_2.fastq` - Unpaired reads (paired-end)
+- `02_trimming/trimmed.fastq` - Trimmed reads (single-end)
+- `02_trimming/fastp_report.json` / `fastp_report.html` - Trimming statistics
 
-**Time:** 3-10 minutes
+**Time:** 2-8 minutes
 
 ---
 
@@ -924,7 +925,7 @@ This runs the pipeline in headless mode with logging.
 output_directory/
 │
 ├── 01_fastqc/                        # Step 1: FastQC reports
-├── 02_trimmomatic/                   # Step 2: Trimmed reads
+├── 02_trimming/                      # Step 2: fastp-trimmed reads + reports
 ├── 03_sortmerna/                     # Step 3: rRNA filtered (optional)
 ├── 04_alignment/                     # Step 4: HISAT2 alignment
 ├── 05_assembly/                      # Step 4: StringTie/Trinity assembly
@@ -1066,7 +1067,7 @@ tail -20 output/pipeline.log
 
 ```bash
 # Check if tools are in PATH
-which fastqc trimmomatic hisat2 cpc2
+which fastqc fastp hisat2 cpc2
 
 # Activate conda environment
 conda activate regis
@@ -1140,7 +1141,7 @@ df -h
 Please also cite the tools used in your analysis:
 
 - **FastQC** - Andrews, S. (2010)
-- **Trimmomatic** - Bolger, A.M. et al. (2014) Bioinformatics
+- **fastp** - Chen, S. et al. (2018) Bioinformatics
 - **HISAT2** - Kim, D. et al. (2019) Nature Biotechnology
 - **StringTie** - Pertea, M. et al. (2015) Nature Biotechnology
 - **CPC2** - Kang, Y.J. et al. (2017) Nucleic Acids Research

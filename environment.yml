@@ -6,13 +6,16 @@ channels:
   - defaults
 dependencies:
   # Build tools (from requirements: build)
-  - go=1.25
+  # Go via conda on Linux only. On macOS (especially Apple Silicon), install Go from
+  # Homebrew and build with `unset GOROOT` or `./scripts/build.sh` — conda's GOROOT
+  # conflicts with Homebrew's `go` and causes: go: no such tool "compile"
+  - go=1.25  # [linux]
   - make
 
   # Runtime dependencies (from requirements: run)
   - python=3.10
   - fastqc>=0.12.1
-  - trimmomatic>=0.39
+  - fastp>=0.23.4
   - sortmerna>=4.3.4
   - trinity>=2.15.2
   - hisat2>=2.2.1

@@ -164,7 +164,7 @@ useQuery({
   "best_candidates": 8,
   "associated_genes": 234,
   "fastqc_metrics": { ... },
-  "trimmomatic_metrics": { ... },
+  "trimmomatic_metrics": { ... },  // v1.1.4+: metrics from fastp (JSON key kept for API compat)
   "hisat2_metrics": { ... },
   "cpc2_metrics": { ... },
   "cpat_metrics": { ... },
