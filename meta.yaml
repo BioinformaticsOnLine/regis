@@ -20,8 +20,9 @@ source:
     - ".DS_Store"
 
 build:
-  noarch: generic
-  number: 0
+  # Platform-specific: regis is a compiled Go+CGO binary (not pure Python).
+  # Do NOT use noarch — a Mac-built binary will break Linux with "Exec format error".
+  number: 1
   # Allow standard system libs (libc, libm, libpthread) to be untracked
   # The Go binary only links these at system level, not through conda.
   missing_dso_whitelist:

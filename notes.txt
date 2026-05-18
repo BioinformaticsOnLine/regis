@@ -79,13 +79,19 @@ go build -o regis . && ./regis --version
 # The explicit `__glibc >=2.17` virtual package constraint in meta.yaml
 # prevents libgcc>=15 injection and ensures compatibility with older and newer glibc.
 
-# Step 1: Build linux-64 package (run this ON a Linux machine)
-conda build . --output-folder ./conda-bld/ -c bioconda -c conda-forge -c jitendralab
+# ─── Conda publish (regis is NOT noarch — build per platform) ───────────────
+# Linux users need linux-64; Mac users need osx-64. Never upload a Mac build as noarch.
 
-# Step 2: Upload noarch build
-anaconda upload -u jitendralab ./conda-bld/noarch/regis-1.1.4-*.tar.bz2
-# or if .conda format:
-anaconda upload -u jitendralab ./conda-bld/noarch/regis-1.1.4-*.conda
+# Linux (on a Linux machine or CI):
+conda build . --output-folder ./conda-bld/ -c bioconda -c conda-forge -c jitendralab
+anaconda upload -u jitendralab ./conda-bld/linux-64/regis-1.1.4-*.tar.bz2
+
+# macOS Apple Silicon / Rosetta (osx-64 bioconda stack):
+CONDA_SUBDIR=osx-64 conda build . --output-folder ./conda-bld/ -c bioconda -c conda-forge -c jitendralab
+anaconda upload -u jitendralab ./conda-bld/osx-64/regis-1.1.4-*.tar.bz2
+
+# Wrong upload (1.1.4 build 0 noarch) contained a Mach-O binary — remove from channel if present:
+# anaconda remove -u jitendralab regis/1.1.4/noarch/regis-1.1.4-0.tar.bz2
 
 # Step 3: Tag the release
 git add meta.yaml
