@@ -1,6 +1,6 @@
-# REGIS v1.1.4 - RNA-seq Guided Identification System
+# REGIS v1.1.5 - RNA-seq Guided Identification System
 
-![Version](https://img.shields.io/badge/Version-1.1.4-brightgreen?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-1.1.5-brightgreen?style=for-the-badge)
 ![Go Version](https://img.shields.io/badge/Go-1.21%2B-00ADD8?style=for-the-badge&logo=go&logoColor=white)
 ![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20macOS-important?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-GPL_v3-blue?style=for-the-badge)
@@ -8,7 +8,7 @@
 
 **REGIS (RNA-seq Guided Identification System)** is a comprehensive, modular bioinformatics pipeline designed for the high-confidence identification and functional characterization of **Long Non-Coding RNAs (lncRNAs)**. 
 
-Re-engineered in **Go**, REGIS v1.1.4 brings a premium **Terminal User Interface (TUI)**, robust process management, REST API server, Slurm HPC support, and a seamless developer experience, while maintaining rigorous scientific accuracy.
+Re-engineered in **Go**, REGIS v1.1.5 brings a premium **Terminal User Interface (TUI)**, robust process management, REST API server, Slurm HPC support, and a seamless developer experience, while maintaining rigorous scientific accuracy.
 
 
 [![Typing SVG](https://readme-typing-svg.demolab.com?font=Fira+Code&size=30&duration=3000&pause=1000&color=00ADD8&center=true&vCenter=true&width=1000&lines=REGIS+%F0%9F%A7%AC+lncRNA+Identification+Pipeline;Built+with+Go+%7C+TUI+%7C+REST+API+%7C+SLURM+Support;NGS+Analysis+%E2%9A%A1+Fast+%E2%9A%A1+Scalable)](https://git.io/typing-svg)
