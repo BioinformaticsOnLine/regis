@@ -89,6 +89,10 @@ func main() {
 	// rRNA filtering
 	pflag.Bool("sortmerna", false, "Enable rRNA filtering (recommended)")
 
+	// RNAfold options
+	pflag.Int("rnafold_limit", 0, "Max sequences for RNAfold/SVG (default 100; 0 = use default)")
+	pflag.Bool("rnafold_full", false, "Run RNAfold on all filtered lncRNAs (no limit)")
+
 	// De novo assembler
 	pflag.String("assembler", "trinity", "De novo assembler: 'trinity' or 'rnabloom'")
 
@@ -190,6 +194,11 @@ func main() {
 		}
 		if cfg.IntaRNABestOnly || cfg.IntaRNAComprehensive || cfg.IntaRNAHighly {
 			cfg.EnableIntaRNA = true
+		}
+
+		// --rnafold-full overrides --rnafold-limit: -1 signals "no cap" to Step08
+		if full, _ := pflag.CommandLine.GetBool("rnafold_full"); full {
+			cfg.RNAfoldLimit = -1
 		}
 	}
 

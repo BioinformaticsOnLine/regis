@@ -196,7 +196,8 @@ func StartServer(port, jobDir string) {
 	fmt.Printf(" • \033[1mExecution Mode\033[0m   : %s\n", cfg.ExecutionMode)
 	fmt.Printf(" • \033[1mRetention Policy\033[0m : %d days\n", cfg.RetentionDays)
 	fmt.Printf(" • \033[1mDocumentation\033[0m    : http://localhost:%s/swagger/index.html\n", port)
-	fmt.Println("──────────────────────────────────────────────────\n")
+	fmt.Println("──────────────────────────────────────────────────")
+	fmt.Println()
 
 	if err := server.Listen(":" + port); err != nil {
 		log.Fatalf("Error starting server: %v", err)

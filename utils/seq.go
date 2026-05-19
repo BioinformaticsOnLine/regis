@@ -9,6 +9,20 @@ import (
 	"github.com/shenwei356/bio/seqio/fastx"
 )
 
+// fastaRecordID returns the primary sequence ID (first whitespace-delimited token).
+// CPC2 and similar tools use only this token; fastx may store the full header line
+// (e.g. "rb_E4.L.2 l=392 c=18433.0" from RNA-Bloom).
+func fastaRecordID(name string) string {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return ""
+	}
+	if i := strings.IndexAny(name, " \t"); i >= 0 {
+		return name[:i]
+	}
+	return name
+}
+
 // ExtractSequences filters a FASTA/FASTQ file and keeps only records with IDs in the provided list file.
 // Equivalent to: seqkit grep -f ids.txt input.fa -o output.fa
 func ExtractSequences(ctxID string, idsFile, inputFile, outputFile string) error {
@@ -53,9 +67,7 @@ func ExtractSequences(ctxID string, idsFile, inputFile, outputFile string) error
 		}
 		count++
 
-		// Check if ID is in the allowlist
-		// fastx Record Name is the ID (without >)
-		if idMap[string(record.Name)] {
+		if idMap[fastaRecordID(string(record.Name))] {
 			// Write to output using proper formatting
 			// record.Format(0) writes ID + Seq + desc if present, width 0 = no wrapping
 			if _, err := out.Write(record.Format(60)); err != nil {
@@ -107,7 +119,7 @@ func ExtractSequencesFromList(ctxID string, ids []string, inputFile, outputFile 
 		}
 		count++
 
-		if idMap[string(record.Name)] {
+		if idMap[fastaRecordID(string(record.Name))] {
 			if _, err := out.Write(record.Format(60)); err != nil {
 				return fmt.Errorf("error writing sequence record: %w", err)
 			}
@@ -137,7 +149,7 @@ func GetSequenceLengths(inputFile string) (map[string]int, error) {
 			}
 			return nil, err
 		}
-		lengths[string(record.Name)] = len(record.Seq.Seq)
+		lengths[fastaRecordID(string(record.Name))] = len(record.Seq.Seq)
 	}
 	return lengths, nil
 }
