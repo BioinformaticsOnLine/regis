@@ -52,8 +52,14 @@ func ShowBanner() {
 	fmt.Println("  -e string     User email (optional for job tracking)")
 	fmt.Println("  -p int        Number of threads (default: all available)")
 	fmt.Println("  -s string     Species for CPAT (Human, Mouse, Fly, Zebrafish)")
-	fmt.Println("  --skip-cpat   Force CPC2-only validation mode")
-	fmt.Println("  --sortmerna   Enable rRNA filtering using SortMeRNA")
+	fmt.Println("  --skip-cpat          Force CPC2-only validation mode")
+	fmt.Println("  --sortmerna          Enable rRNA filtering using SortMeRNA")
+	fmt.Println("  --rnafold-limit N    Max sequences for RNAfold (default 100)")
+	fmt.Println("  --rnafold-full       Run RNAfold on all filtered lncRNAs")
+	fmt.Println()
+	fmt.Println("RESUME / CHECKPOINT:")
+	fmt.Println("  --resume             Skip steps whose output already exists")
+	fmt.Println("  --from-step N        Hard-skip all steps before N (e.g. --from-step 5)")
 	fmt.Println()
 
 	// Target prediction

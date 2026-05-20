@@ -50,6 +50,10 @@ type Config struct {
 	// RNAfold options
 	RNAfoldLimit int `json:"rnafold_limit" mapstructure:"rnafold_limit"` // Max sequences for RNAfold (0 = use default 100, -1 = unlimited)
 
+	// Resume / checkpoint options
+	Resume   bool `json:"resume" mapstructure:"resume"`         // Skip steps whose output already exists
+	FromStep int  `json:"from_step" mapstructure:"from_step"`   // Hard-skip all steps before this number (1-based)
+
 	// Validation options
 	SkipCPAT  bool   `json:"skip_cpat" mapstructure:"skip_cpat"`   // CPC2-only mode
 	CPATHex   string `json:"cpat_hex" mapstructure:"cpat_hex"`     // Custom CPAT hexamer model
@@ -172,6 +176,8 @@ func Load(f *pflag.FlagSet, configFile string) (*Config, error) {
 			"intarna_all":           "IntaRNAComprehensive", // alias
 			"species":              "Species",
 			"rnafold_limit":        "RNAfoldLimit",
+			"resume":               "Resume",
+			"from_step":            "FromStep",
 			"skip_cpat":            "SkipCPAT",
 			"sortmerna":            "EnableSortMeRNA",
 			"threads":              "Threads",

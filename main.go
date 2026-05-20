@@ -93,6 +93,10 @@ func main() {
 	pflag.Int("rnafold_limit", 0, "Max sequences for RNAfold/SVG (default 100; 0 = use default)")
 	pflag.Bool("rnafold_full", false, "Run RNAfold on all filtered lncRNAs (no limit)")
 
+	// Resume / checkpoint options
+	pflag.Bool("resume", false, "Skip steps whose output already exists (safe re-run after interruption)")
+	pflag.Int("from_step", 0, "Hard-skip all steps before N and start from step N (e.g. --from-step 5)")
+
 	// De novo assembler
 	pflag.String("assembler", "trinity", "De novo assembler: 'trinity' or 'rnabloom'")
 
@@ -365,8 +369,25 @@ func getIntaRNAMode(cfg *config.Config) string {
 	return "highly expressed"
 }
 
+// tuiStep wraps a single pipeline step for the TUI path.
+// It checks checkpoints (--resume / --from-step) before running, and marks
+// the step complete in the TUI regardless of whether it was skipped or ran.
+func tuiStep(ctx context.Context, cfg *config.Config, program *tea.Program, stepNum int, name, tool string, fn func() error) error {
+	if modules.ShouldSkipStep(cfg, stepNum) {
+		tui.SendStepComplete(program, stepNum, true, 0)
+		return nil
+	}
+	tui.SendStepStart(program, stepNum, name, tool)
+	if err := fn(); err != nil {
+		tui.SendStepComplete(program, stepNum, false, 0)
+		return fmt.Errorf("Step %d failed: %w", stepNum, err)
+	}
+	tui.SendStepComplete(program, stepNum, true, 0)
+	return nil
+}
+
 func runPipeline(ctx context.Context, cfg *config.Config, program *tea.Program) error {
-	// Step 0: Dependency Check
+	// Step 0: Dependency Check (never skipped)
 	tui.SendStepStart(program, 0, "Checking Dependencies", "dependency_check")
 	if err := modules.Step00CheckDependencies(ctx, cfg); err != nil {
 		tui.SendStepComplete(program, 0, false, 0)
@@ -375,29 +396,26 @@ func runPipeline(ctx context.Context, cfg *config.Config, program *tea.Program) 
 	tui.SendStepComplete(program, 0, true, 0)
 
 	// Step 1: FastQC
-	tui.SendStepStart(program, 1, "Quality Control with FastQC", "fastqc")
-	if err := modules.Step01QCFastQC(ctx, cfg); err != nil {
-		tui.SendStepComplete(program, 1, false, 0)
-		return fmt.Errorf("Step 1 failed: %w", err)
+	if err := tuiStep(ctx, cfg, program, 1, "Quality Control with FastQC", "fastqc", func() error {
+		return modules.Step01QCFastQC(ctx, cfg)
+	}); err != nil {
+		return err
 	}
-	tui.SendStepComplete(program, 1, true, 0)
 
 	// Step 2: fastp
-	tui.SendStepStart(program, 2, "Quality Trimming with fastp", "fastp")
-	if err := modules.Step02TrimFastp(ctx, cfg); err != nil {
-		tui.SendStepComplete(program, 2, false, 0)
-		return fmt.Errorf("Step 2 failed: %w", err)
+	if err := tuiStep(ctx, cfg, program, 2, "Quality Trimming with fastp", "fastp", func() error {
+		return modules.Step02TrimFastp(ctx, cfg)
+	}); err != nil {
+		return err
 	}
-	tui.SendStepComplete(program, 2, true, 0)
 
 	// Step 3: SortMeRNA (optional)
 	if cfg.EnableSortMeRNA {
-		tui.SendStepStart(program, 3, "rRNA Filtering with SortMeRNA", "sortmerna")
-		if err := modules.Step03SortMeRNA(ctx, cfg); err != nil {
-			tui.SendStepComplete(program, 3, false, 0)
-			return fmt.Errorf("Step 3 failed: %w", err)
+		if err := tuiStep(ctx, cfg, program, 3, "rRNA Filtering with SortMeRNA", "sortmerna", func() error {
+			return modules.Step03SortMeRNA(ctx, cfg)
+		}); err != nil {
+			return err
 		}
-		tui.SendStepComplete(program, 3, true, 0)
 	}
 
 	// Step 4: Alignment/Assembly
@@ -407,112 +425,99 @@ func runPipeline(ctx context.Context, cfg *config.Config, program *tea.Program) 
 	} else if cfg.Assembler == "rnabloom" {
 		stepName = "De Novo Assembly with RNA-Bloom"
 	}
-	tui.SendStepStart(program, 4, stepName, "hisat2/trinity/rnabloom")
-	if err := modules.Step04AlignAssembly(ctx, cfg); err != nil {
-		tui.SendStepComplete(program, 4, false, 0)
-		return fmt.Errorf("Step 4 failed: %w", err)
+	if err := tuiStep(ctx, cfg, program, 4, stepName, "hisat2/trinity/rnabloom", func() error {
+		return modules.Step04AlignAssembly(ctx, cfg)
+	}); err != nil {
+		return err
 	}
-	tui.SendStepComplete(program, 4, true, 0)
 
 	// Step 5: CPC2
-	tui.SendStepStart(program, 5, "Coding Potential with CPC2", "cpc2")
-	if err := modules.Step05CPC2(ctx, cfg); err != nil {
-		tui.SendStepComplete(program, 5, false, 0)
-		return fmt.Errorf("Step 5 failed: %w", err)
+	if err := tuiStep(ctx, cfg, program, 5, "Coding Potential with CPC2", "cpc2", func() error {
+		return modules.Step05CPC2(ctx, cfg)
+	}); err != nil {
+		return err
 	}
-	tui.SendStepComplete(program, 5, true, 0)
 
 	// Step 6: CPAT + Consensus
-	tui.SendStepStart(program, 6, "Cross-Validation with CPAT", "cpat")
-	if err := modules.Step06CPAT(ctx, cfg); err != nil {
-		tui.SendStepComplete(program, 6, false, 0)
-		return fmt.Errorf("Step 6 failed: %w", err)
+	if err := tuiStep(ctx, cfg, program, 6, "Cross-Validation with CPAT", "cpat", func() error {
+		return modules.Step06CPAT(ctx, cfg)
+	}); err != nil {
+		return err
 	}
-	tui.SendStepComplete(program, 6, true, 0)
 
 	// Step 7: lncRNA Filtering
-	tui.SendStepStart(program, 7, "Processing GTF and Filtering lncRNAs", "seqkit/gffcompare")
-	if err := modules.Step07FilterLncRNA(ctx, cfg); err != nil {
-		tui.SendStepComplete(program, 7, false, 0)
-		return fmt.Errorf("Step 7 failed: %w", err)
+	if err := tuiStep(ctx, cfg, program, 7, "Processing GTF and Filtering lncRNAs", "seqkit/gffcompare", func() error {
+		return modules.Step07FilterLncRNA(ctx, cfg)
+	}); err != nil {
+		return err
 	}
-	tui.SendStepComplete(program, 7, true, 0)
 
 	// Step 8: RNAfold
-	tui.SendStepStart(program, 8, "lncRNA Secondary Structure Prediction", "RNAfold")
-	if err := modules.Step08RNAfold(ctx, cfg); err != nil {
-		tui.SendStepComplete(program, 8, false, 0)
-		return fmt.Errorf("Step 8 failed: %w", err)
+	if err := tuiStep(ctx, cfg, program, 8, "lncRNA Secondary Structure Prediction", "RNAfold", func() error {
+		return modules.Step08RNAfold(ctx, cfg)
+	}); err != nil {
+		return err
 	}
-	tui.SendStepComplete(program, 8, true, 0)
 
 	// Step 9: LncTar (optional)
 	if cfg.EnableLncTar {
-		tui.SendStepStart(program, 9, "Predicting lncRNA-mRNA Interactions with LncTar", "LncTar")
-		if err := modules.Step09LncTar(ctx, cfg); err != nil {
-			tui.SendStepComplete(program, 9, false, 0)
-			return fmt.Errorf("Step 9 failed: %w", err)
+		if err := tuiStep(ctx, cfg, program, 9, "Predicting lncRNA-mRNA Interactions with LncTar", "LncTar", func() error {
+			return modules.Step09LncTar(ctx, cfg)
+		}); err != nil {
+			return err
 		}
-		tui.SendStepComplete(program, 9, true, 0)
 	}
 
 	// Step 10: IntaRNA (optional)
 	if cfg.EnableIntaRNA {
-		tui.SendStepStart(program, 10, "Cross-Validating Targets with IntaRNA", "IntaRNA")
-		if err := modules.Step10IntaRNA(ctx, cfg); err != nil {
-			tui.SendStepComplete(program, 10, false, 0)
-			return fmt.Errorf("Step 10 failed: %w", err)
+		if err := tuiStep(ctx, cfg, program, 10, "Cross-Validating Targets with IntaRNA", "IntaRNA", func() error {
+			return modules.Step10IntaRNA(ctx, cfg)
+		}); err != nil {
+			return err
 		}
-		tui.SendStepComplete(program, 10, true, 0)
 	}
 
 	// Step 11: Consensus
-	tui.SendStepStart(program, 11, "Cross-Tool Consensus Analysis", "consensus")
-	if err := modules.Step11Consensus(ctx, cfg); err != nil {
-		tui.SendStepComplete(program, 11, false, 0)
-		return fmt.Errorf("Step 11 failed: %w", err)
+	if err := tuiStep(ctx, cfg, program, 11, "Cross-Tool Consensus Analysis", "consensus", func() error {
+		return modules.Step11Consensus(ctx, cfg)
+	}); err != nil {
+		return err
 	}
-	tui.SendStepComplete(program, 11, true, 0)
 
 	// Step 12: Enrichment
-	tui.SendStepStart(program, 12, "Building Enrichment Gene Lists", "bedtools")
-	if err := modules.Step12Enrichment(ctx, cfg); err != nil {
-		tui.SendStepComplete(program, 12, false, 0)
-		return fmt.Errorf("Step 12 failed: %w", err)
+	if err := tuiStep(ctx, cfg, program, 12, "Building Enrichment Gene Lists", "bedtools", func() error {
+		return modules.Step12Enrichment(ctx, cfg)
+	}); err != nil {
+		return err
 	}
-	tui.SendStepComplete(program, 12, true, 0)
 
 	// Step 13: RSeQC
-	tui.SendStepStart(program, 13, "RNA-seq Quality Assessment with RSeQC", "RSeQC")
-	if err := modules.Step13RSeQC(ctx, cfg); err != nil {
-		tui.SendStepComplete(program, 13, false, 0)
-		return fmt.Errorf("Step 13 failed: %w", err)
+	if err := tuiStep(ctx, cfg, program, 13, "RNA-seq Quality Assessment with RSeQC", "RSeQC", func() error {
+		return modules.Step13RSeQC(ctx, cfg)
+	}); err != nil {
+		return err
 	}
-	tui.SendStepComplete(program, 13, true, 0)
 
 	// Step 14: IGV Report
-	tui.SendStepStart(program, 14, "Creating IGV Genome Browser Report", "create_report")
-	if err := modules.Step14IGV(ctx, cfg); err != nil {
-		tui.SendStepComplete(program, 14, false, 0)
-		return fmt.Errorf("Step 14 failed: %w", err)
+	if err := tuiStep(ctx, cfg, program, 14, "Creating IGV Genome Browser Report", "create_report", func() error {
+		return modules.Step14IGV(ctx, cfg)
+	}); err != nil {
+		return err
 	}
-	tui.SendStepComplete(program, 14, true, 0)
 
 	// Step 15: MultiQC
-	tui.SendStepStart(program, 15, "Generating MultiQC Report", "multiqc")
-	if err := modules.Step15MultiQC(ctx, cfg); err != nil {
-		tui.SendStepComplete(program, 15, false, 0)
-		return fmt.Errorf("Step 15 failed: %w", err)
+	if err := tuiStep(ctx, cfg, program, 15, "Generating MultiQC Report", "multiqc", func() error {
+		return modules.Step15MultiQC(ctx, cfg)
+	}); err != nil {
+		return err
 	}
-	tui.SendStepComplete(program, 15, true, 0)
 
 	// Step 16: Generate Summary Report
-	tui.SendStepStart(program, 16, "Generating Pipeline Summary Report", "report")
-	if err := modules.Step16GenerateReport(ctx, cfg); err != nil {
-		tui.SendStepComplete(program, 16, false, 0)
-		return fmt.Errorf("Step 16 failed: %w", err)
+	if err := tuiStep(ctx, cfg, program, 16, "Generating Pipeline Summary Report", "report", func() error {
+		return modules.Step16GenerateReport(ctx, cfg)
+	}); err != nil {
+		return err
 	}
-	tui.SendStepComplete(program, 16, true, 0)
 
 	return nil
 }
