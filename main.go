@@ -98,7 +98,7 @@ func main() {
 	pflag.Int("from_step", 0, "Hard-skip all steps before N and start from step N (e.g. --from-step 5)")
 
 	// De novo assembler
-	pflag.String("assembler", "trinity", "De novo assembler: 'trinity' or 'rnabloom'")
+	pflag.String("assembler", "rnabloom", "De novo assembler: 'trinity' or 'rnabloom'")
 
 	// Strandedness
 	pflag.String("stranded", "unstranded", "Library strandedness: 'unstranded', 'rf', 'fr', 'f', 'r'")

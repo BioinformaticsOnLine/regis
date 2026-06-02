@@ -27,7 +27,7 @@ func ValidateConfig(cfg *config.Config) error {
 
 	// Validate and normalize assembler (only relevant for denovo)
 	if cfg.Assembler == "" {
-		cfg.Assembler = "trinity"
+		cfg.Assembler = "rnabloom"
 	}
 	cfg.Assembler = strings.ToLower(cfg.Assembler)
 	if cfg.Assembler != "trinity" && cfg.Assembler != "rnabloom" {
