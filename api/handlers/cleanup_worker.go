@@ -3,6 +3,8 @@ package handlers
 import (
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/BioinformaticsOnLine/regis/api/db"
@@ -11,7 +13,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// StartCleanupWorker starts a background routine to purge old job files
+// StartCleanupWorker starts a background routine to purge old job files and uploads
 func StartCleanupWorker(cfg *config.Config) {
 	if cfg.RetentionDays < 0 {
 		utils.Logger.Info("Job cleanup disabled (RetentionDays < 0)")
@@ -28,6 +30,7 @@ func StartCleanupWorker(cfg *config.Config) {
 			select {
 			case <-ticker.C:
 				cleanupOldJobs(cfg.RetentionDays)
+				cleanupOldUploads(BaseJobDir, cfg.RetentionDays)
 			}
 		}
 	}()
@@ -77,5 +80,85 @@ func updateJobStatusMerged(job *Job) {
 	job.Error = "Output files purged due to retention policy"
 	if err := db.GetDB().Save(job).Error; err != nil {
 		fmt.Printf("Error updating job status: %v\n", err)
+	}
+}
+
+// cleanupOldUploads deletes upload directories that are no longer referenced by
+// any active job (queued/running/submitted) and are older than retentionDays.
+func cleanupOldUploads(baseJobDir string, retentionDays int) {
+	uploadsDir := filepath.Join(baseJobDir, "uploads")
+	entries, err := os.ReadDir(uploadsDir)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			utils.Logger.Error("Failed to read uploads dir", zap.Error(err))
+		}
+		return
+	}
+
+	if len(entries) == 0 {
+		return
+	}
+
+	// Collect file paths referenced by jobs that are still active.
+	// We never delete uploads while a job is queued, running, or submitted.
+	var activeJobs []Job
+	db.GetDB().Where("status IN ?", []string{"queued", "running", "submitted"}).Find(&activeJobs)
+
+	activeUploadDirs := make(map[string]struct{})
+	for _, job := range activeJobs {
+		if job.Config == nil {
+			continue
+		}
+		for _, path := range []string{job.Config.File1, job.Config.File2, job.Config.Reference, job.Config.GTF} {
+			if path == "" {
+				continue
+			}
+			// Mark the upload UUID dir that contains this file as active.
+			// Upload paths look like: {baseJobDir}/uploads/{uuid}/{filename}
+			rel, err := filepath.Rel(uploadsDir, path)
+			if err != nil || strings.HasPrefix(rel, "..") {
+				continue
+			}
+			parts := strings.SplitN(rel, string(filepath.Separator), 2)
+			if len(parts) > 0 && parts[0] != "" {
+				activeUploadDirs[parts[0]] = struct{}{}
+			}
+		}
+	}
+
+	cutoff := time.Now().AddDate(0, 0, -retentionDays)
+
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+
+		// Skip if this upload dir is still needed by an active job.
+		if _, isActive := activeUploadDirs[entry.Name()]; isActive {
+			continue
+		}
+
+		uploadPath := filepath.Join(uploadsDir, entry.Name())
+		info, err := entry.Info()
+		if err != nil {
+			continue
+		}
+
+		if info.ModTime().After(cutoff) {
+			continue // Not old enough yet
+		}
+
+		utils.Logger.Info("Purging old upload directory",
+			zap.String("upload_id", entry.Name()),
+			zap.String("path", uploadPath),
+			zap.Time("modified", info.ModTime()),
+		)
+
+		if err := os.RemoveAll(uploadPath); err != nil {
+			utils.Logger.Error("Failed to delete upload dir",
+				zap.String("path", uploadPath),
+				zap.Error(err),
+			)
+		}
 	}
 }

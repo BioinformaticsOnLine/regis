@@ -1,6 +1,8 @@
 package api
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"log"
 	"os"
@@ -139,6 +141,44 @@ func (s *Server) Listen(addr string) error {
 	return s.App.Listen(addr)
 }
 
+// resolveAPIKey returns a stable API key using the following priority:
+//  1. REGIS_API_KEY environment variable (explicit override)
+//  2. Persisted key from {jobDir}/.api_key (survives restarts)
+//  3. Newly generated UUID written to {jobDir}/.api_key for future reuse
+func resolveAPIKey(jobDir string) string {
+	if key := os.Getenv("REGIS_API_KEY"); key != "" {
+		return key
+	}
+
+	keyFile := filepath.Join(jobDir, ".api_key")
+	if data, err := os.ReadFile(keyFile); err == nil {
+		if key := strings.TrimSpace(string(data)); key != "" {
+			return key
+		}
+	}
+
+	// Generate a new key and persist it so the next restart reuses it.
+	key := generateAPIKey()
+	_ = os.WriteFile(keyFile, []byte(key+"\n"), 0600)
+	return key
+}
+
+// generateAPIKey creates a cryptographically random API key in UUID-like format.
+func generateAPIKey() string {
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		// Fall back to a time-seeded value if crypto/rand is unavailable.
+		return fmt.Sprintf("%x", time.Now().UnixNano())
+	}
+	return fmt.Sprintf("%s-%s-%s-%s-%s",
+		hex.EncodeToString(b[0:4]),
+		hex.EncodeToString(b[4:6]),
+		hex.EncodeToString(b[6:8]),
+		hex.EncodeToString(b[8:10]),
+		hex.EncodeToString(b[10:16]),
+	)
+}
+
 // StartServer initializes and starts the API server
 func StartServer(port, jobDir string) {
 	// Initialize Database
@@ -165,9 +205,10 @@ func StartServer(port, jobDir string) {
 	}
 	defer utils.Sync()
 
-	// Initial Configuration
-	// TODO: Load this from a file or env instead of default if needed for the server itself
+	// Build server configuration.
+	// API key priority: REGIS_API_KEY env → persisted {jobDir}/.api_key → newly generated (then persisted).
 	cfg := config.NewConfig()
+	cfg.APIKey = resolveAPIKey(jobDir)
 	cfg.EnsureDefaults()
 
 	// Create Server
