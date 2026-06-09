@@ -14,6 +14,7 @@ import (
 	"github.com/BioinformaticsOnLine/regis/config"
 	"github.com/BioinformaticsOnLine/regis/modules"
 	"github.com/BioinformaticsOnLine/regis/tui"
+	"golang.org/x/term"
 	"github.com/BioinformaticsOnLine/regis/utils"
 	"github.com/BioinformaticsOnLine/regis/version"
 	tea "github.com/charmbracelet/bubbletea"
@@ -228,6 +229,26 @@ func main() {
 		os.Exit(1)
 	}
 
+	// ── TTY Detection ────────────────────────────────────────────────────────────
+	// If stdout is not a terminal (Slurm, nohup, CI, piped output) skip the
+	// Bubble Tea dashboard and run headlessly, logging to pipeline.log.
+	if !term.IsTerminal(int(os.Stdout.Fd())) {
+		fmt.Println("[regis] No TTY detected — running in headless mode (see pipeline.log)")
+		utils.SetTUIMode(false)
+
+		ctx, cancel := utils.SetupSignalHandler()
+		defer cancel()
+
+		runner := modules.NewPipelineRunner(cfg)
+		if err := runner.RunHeadless(ctx); err != nil {
+			fmt.Fprintf(os.Stderr, "Pipeline failed: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Println("[regis] Pipeline completed successfully.")
+		os.Exit(0)
+	}
+
+	// ── Interactive TUI Dashboard ─────────────────────────────────────────────
 	// Launch TUI
 	msgChan := make(chan tea.Msg, 100)
 	model := tui.NewModel(msgChan)

@@ -1,6 +1,6 @@
-# REGIS v1.1.8 - RNA-seq Guided Identification System
+# REGIS v1.1.9 - RNA-seq Guided Identification System
 
-![Version](https://img.shields.io/badge/Version-1.1.8-brightgreen?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-1.1.9-brightgreen?style=for-the-badge)
 ![Go Version](https://img.shields.io/badge/Go-1.21%2B-00ADD8?style=for-the-badge&logo=go&logoColor=white)
 ![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20macOS-important?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-GPL_v3-blue?style=for-the-badge)
