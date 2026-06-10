@@ -32,6 +32,8 @@ func (s *Server) SetupRoutes() {
 	jobs.Get("/:uuid/results", handlers.GetJobResults)
 	jobs.Get("/:uuid/results/metrics", handlers.GetJobMetrics)
 	jobs.Get("/:uuid/results/download", handlers.DownloadJobResults)
+	jobs.Get("/:uuid/results/files", handlers.BrowseJobFiles)
+	jobs.Get("/:uuid/results/files/download", handlers.DownloadJobSelection)
 
 	// Fallback for unknown routes
 	s.App.Use(func(c *fiber.Ctx) error {
